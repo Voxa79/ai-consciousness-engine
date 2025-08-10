@@ -3,7 +3,7 @@
 
 [build]
   base = "web-ui"
-  publish = "web-ui/build"
+  publish = "build"
   command = "npm run build"
 
   [build.environment]

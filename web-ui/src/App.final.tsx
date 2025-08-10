@@ -84,9 +84,10 @@ const FinalDiagnosticPage: React.FC = () => {
     }
     
     const endTime = performance.now();
-    const duration = (endTime - startTime).toFixed(2);
+    const durationMs = endTime - startTime; // number
+    const duration = durationMs.toFixed(2); // string for display
     
-    setTestResult(`🚀 TEST DE PERFORMANCE:\n\n✅ Calcul de 100k opérations: ${duration}ms\n✅ Performance: ${duration < 10 ? 'EXCELLENTE' : duration < 50 ? 'BONNE' : 'ACCEPTABLE'}\n✅ Mémoire: Stable\n✅ CPU: Normal`);
+    setTestResult(`🚀 TEST DE PERFORMANCE:\n\n✅ Calcul de 100k opérations: ${duration}ms\n✅ Performance: ${durationMs < 10 ? 'EXCELLENTE' : durationMs < 50 ? 'BONNE' : 'ACCEPTABLE'}\n✅ Mémoire: Stable\n✅ CPU: Normal`);
   };
 
   return (
