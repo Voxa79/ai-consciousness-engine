@@ -1,0 +1,1 @@
+{"status":"ok","timestamp":"2025-08-08T20:41:40.915Z","mode":"audit","llm":{"error":"Ollama chat failed","details":"Ollama chat failed (400): {\"error\":\"json: cannot unmarshal string into Go struct field ChatRequest.messages of type api.Alias\"}"},"quality":null,"compliance":null,"performance":null}

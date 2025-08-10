@@ -1,0 +1,191 @@
+# Development Environment Configuration
+# Optimized for local development with debugging and hot reload
+
+environment: development
+
+# Consciousness Engine Configuration
+consciousness_engine:
+  log_level: debug
+  processing_timeout_ms: 1000  # Relaxed for debugging
+  quality_threshold: 0.80      # Lower threshold for development
+  memory_limit_mb: 100
+  enable_profiling: true
+  enable_benchmarking: true
+  
+  # Development-specific features
+  hot_reload: true
+  debug_mode: true
+  verbose_logging: true
+  
+  # Performance settings (relaxed)
+  max_concurrent_requests: 10
+  request_queue_size: 100
+  worker_threads: 2
+
+# API Gateway Configuration
+api_gateway:
+  port: 8080
+  log_level: debug
+  cors_enabled: true
+  cors_origins: ["http://localhost:3000", "http://localhost:80"]
+  
+  # Rate limiting (relaxed for development)
+  rate_limit:
+    requests_per_minute: 1000
+    burst_size: 100
+  
+  # Authentication (development keys)
+  jwt:
+    secret: "dev_jwt_secret_change_in_production"
+    expiry_hours: 24
+  
+  # Timeouts
+  request_timeout_ms: 30000
+  consciousness_timeout_ms: 10000
+
+# Database Configuration
+database:
+  host: postgres
+  port: 5432
+  name: consciousness_dev
+  username: consciousness
+  password: consciousness_dev_password
+  
+  # Connection pool
+  max_connections: 10
+  min_connections: 2
+  connection_timeout_ms: 5000
+  
+  # Development settings
+  log_queries: true
+  auto_migrate: true
+
+# Redis Configuration
+redis:
+  host: redis
+  port: 6379
+  password: consciousness_redis_password
+  database: 0
+  
+  # Connection pool
+  max_connections: 10
+  connection_timeout_ms: 3000
+  
+  # Cache settings
+  default_ttl_seconds: 3600
+  max_memory_mb: 100
+
+# Web UI Configuration
+web_ui:
+  api_url: http://localhost:8080
+  websocket_url: ws://localhost:8080/ws
+  
+  # Development settings
+  hot_reload: true
+  source_maps: true
+  debug_mode: true
+  
+  # Feature flags
+  features:
+    consciousness_chat: true
+    performance_monitoring: true
+    debug_panel: true
+    benchmark_ui: true
+
+# Monitoring Configuration
+monitoring:
+  enabled: true
+  
+  # Prometheus
+  prometheus:
+    enabled: true
+    port: 9090
+    scrape_interval: 15s
+  
+  # Grafana
+  grafana:
+    enabled: true
+    port: 3001
+    admin_password: consciousness_grafana_dev
+  
+  # Jaeger
+  jaeger:
+    enabled: true
+    port: 16686
+  
+  # Logging
+  logging:
+    level: debug
+    format: json
+    output: stdout
+
+# Security Configuration (Development)
+security:
+  # Relaxed for development
+  tls_enabled: false
+  certificate_validation: false
+  
+  # CORS
+  cors:
+    enabled: true
+    allow_origins: ["*"]
+    allow_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    allow_headers: ["*"]
+  
+  # Rate limiting
+  rate_limiting:
+    enabled: true
+    global_limit: 1000
+    per_ip_limit: 100
+
+# Performance Configuration
+performance:
+  # CPU limits (development)
+  cpu_limit: "1.0"
+  cpu_request: "0.1"
+  
+  # Memory limits
+  memory_limit: "512Mi"
+  memory_request: "128Mi"
+  
+  # Scaling
+  min_replicas: 1
+  max_replicas: 2
+  
+  # Health checks
+  health_check:
+    initial_delay_seconds: 10
+    period_seconds: 30
+    timeout_seconds: 5
+    failure_threshold: 3
+
+# Feature Flags
+features:
+  consciousness_processing: true
+  neuromorphic_acceleration: false  # Disabled in dev
+  quantum_processing: false         # Disabled in dev
+  multimodal_fusion: true
+  ethical_reasoning: true
+  benchmarking: true
+  profiling: true
+  debug_mode: true
+
+# Development Tools
+dev_tools:
+  # Hot reload
+  hot_reload:
+    enabled: true
+    watch_paths: ["src/", "web-ui/src/"]
+  
+  # Debug endpoints
+  debug_endpoints:
+    enabled: true
+    profiling: "/debug/profiling"
+    metrics: "/debug/metrics"
+    health: "/debug/health"
+  
+  # Test data
+  test_data:
+    enabled: true
+    seed_database: true
+    mock_responses: false

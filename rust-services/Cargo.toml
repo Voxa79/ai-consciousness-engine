@@ -1,0 +1,28 @@
+[workspace]
+members = [
+    "consciousness-engine",
+    "api-gateway", 
+    "user-service",
+    "conversation-service",
+    "metrics-service"
+]
+
+[workspace.dependencies]
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono"] }
+uuid = { version = "1.0", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+axum = "0.7"
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
+anyhow = "1.0"
+thiserror = "1.0"
+redis = { version = "0.24", features = ["tokio-comp"] }
+reqwest = { version = "0.11", features = ["json"] }
+jsonwebtoken = "9.0"
+bcrypt = "0.15"
+config = "0.14"

@@ -1,0 +1,143 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: vault
+  namespace: vault
+  labels:
+    app.kubernetes.io/name: vault
+    app.kubernetes.io/instance: vault
+    app.kubernetes.io/component: security
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: vault
+      app.kubernetes.io/instance: vault
+  endpoints:
+  - port: http
+    interval: 30s
+    path: /v1/sys/metrics
+    scheme: https
+    tlsConfig:
+      insecureSkipVerify: true
+    params:
+      format: ['prometheus']
+    bearerTokenSecret:
+      name: vault-metrics-token
+      key: token
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vault-metrics-token
+  namespace: vault
+  labels:
+    app.kubernetes.io/name: vault
+    app.kubernetes.io/instance: vault
+    app.kubernetes.io/component: security
+type: Opaque
+data:
+  # This will be populated by the vault-init job
+  token: ""
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: vault-alerts
+  namespace: vault
+  labels:
+    app.kubernetes.io/name: vault
+    app.kubernetes.io/instance: vault
+    app.kubernetes.io/component: security
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+  - name: vault.rules
+    rules:
+    - alert: VaultDown
+      expr: up{job="vault"} == 0
+      for: 1m
+      labels:
+        severity: critical
+        service: vault
+      annotations:
+        summary: "Vault instance is down"
+        description: "Vault instance {{ $labels.instance }} has been down for more than 1 minute."
+        runbook_url: "https://docs.consciousness-engine.com/runbooks/vault-down"
+    
+    - alert: VaultSealed
+      expr: vault_core_unsealed == 0
+      for: 1m
+      labels:
+        severity: critical
+        service: vault
+      annotations:
+        summary: "Vault is sealed"
+        description: "Vault instance {{ $labels.instance }} is sealed and cannot serve requests."
+        runbook_url: "https://docs.consciousness-engine.com/runbooks/vault-sealed"
+    
+    - alert: VaultHighMemoryUsage
+      expr: (vault_runtime_alloc_bytes / vault_runtime_sys_bytes) > 0.9
+      for: 5m
+      labels:
+        severity: warning
+        service: vault
+      annotations:
+        summary: "Vault high memory usage"
+        description: "Vault instance {{ $labels.instance }} is using more than 90% of allocated memory."
+        runbook_url: "https://docs.consciousness-engine.com/runbooks/vault-high-memory"
+    
+    - alert: VaultHighCPUUsage
+      expr: rate(vault_runtime_total_gc_pause_ns[5m]) > 1000000000
+      for: 5m
+      labels:
+        severity: warning
+        service: vault
+      annotations:
+        summary: "Vault high CPU usage"
+        description: "Vault instance {{ $labels.instance }} is experiencing high GC pressure."
+        runbook_url: "https://docs.consciousness-engine.com/runbooks/vault-high-cpu"
+    
+    - alert: VaultTooManyRequests
+      expr: rate(vault_core_handle_request_count[5m]) > 1000
+      for: 2m
+      labels:
+        severity: warning
+        service: vault
+      annotations:
+        summary: "Vault receiving too many requests"
+        description: "Vault instance {{ $labels.instance }} is receiving more than 1000 requests per second."
+        runbook_url: "https://docs.consciousness-engine.com/runbooks/vault-high-requests"
+    
+    - alert: VaultLeadershipLoss
+      expr: vault_core_leadership_lost_count > 0
+      for: 1m
+      labels:
+        severity: warning
+        service: vault
+      annotations:
+        summary: "Vault leadership lost"
+        description: "Vault instance {{ $labels.instance }} has lost leadership."
+        runbook_url: "https://docs.consciousness-engine.com/runbooks/vault-leadership-loss"
+    
+    - alert: VaultTokenExpiringSoon
+      expr: vault_expire_num_leases > 1000
+      for: 5m
+      labels:
+        severity: info
+        service: vault
+      annotations:
+        summary: "Many Vault tokens expiring soon"
+        description: "Vault instance {{ $labels.instance }} has more than 1000 leases expiring soon."
+        runbook_url: "https://docs.consciousness-engine.com/runbooks/vault-token-expiry"
+    
+    - alert: VaultAuditDeviceFailure
+      expr: vault_audit_log_request_failure > 0
+      for: 1m
+      labels:
+        severity: critical
+        service: vault
+      annotations:
+        summary: "Vault audit device failure"
+        description: "Vault instance {{ $labels.instance }} is experiencing audit device failures."
+        runbook_url: "https://docs.consciousness-engine.com/runbooks/vault-audit-failure"

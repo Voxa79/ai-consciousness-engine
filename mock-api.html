@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mock Consciousness API</title>
+</head>
+<body>
+    <h1>Mock Consciousness API</h1>
+    <p>This is a simple mock API for testing.</p>
+    
+    <script>
+        // Simple mock API responses
+        if (window.location.pathname === '/health') {
+            document.body.innerHTML = JSON.stringify({
+                status: "healthy",
+                timestamp: new Date().toISOString(),
+                version: "1.0.0-mock"
+            });
+        } else if (window.location.pathname === '/api/v1/consciousness/process') {
+            document.body.innerHTML = JSON.stringify({
+                id: "mock-" + Math.random().toString(36).substr(2, 9),
+                content: "This is a mock consciousness response. The real API is being built!",
+                confidence: 0.85,
+                consciousness_level: 0.8,
+                emotional_state: {
+                    primary_emotion: "calm",
+                    intensity: 0.7,
+                    valence: 0.0,
+                    arousal: 0.5
+                },
+                ethical_score: 0.95,
+                creativity_score: 0.7,
+                empathy_score: 0.8,
+                processing_time_ms: 120,
+                reasoning_summary: "Mock reasoning process",
+                quality_score: 0.9,
+                timestamp: new Date().toISOString()
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+# Netlify Configuration for Consciousness Engine
+# Minimal production configuration for CRA-based web-ui
+
+[build]
+  base = "web-ui"
+  publish = "web-ui/build"
+  command = "npm run build"
+
+  [build.environment]
+    NODE_VERSION = "20"
+
+# Single Page App fallback
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

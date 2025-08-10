@@ -1,0 +1,77 @@
+[package]
+name = "consciousness-service"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+# Workspace dependencies
+shared = { path = "../shared" }
+
+# Core async and HTTP
+tokio.workspace = true
+axum.workspace = true
+tower.workspace = true
+tower-http.workspace = true
+hyper.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Database and caching
+sqlx.workspace = true
+redis.workspace = true
+
+# Authentication and security
+jsonwebtoken.workspace = true
+uuid.workspace = true
+
+# Observability
+tracing.workspace = true
+tracing-subscriber.workspace = true
+metrics.workspace = true
+metrics-exporter-prometheus.workspace = true
+
+# Configuration
+config.workspace = true
+clap.workspace = true
+
+# Error handling
+anyhow.workspace = true
+thiserror.workspace = true
+
+# Time
+chrono.workspace = true
+
+# Validation
+validator.workspace = true
+
+# HTTP client
+reqwest.workspace = true
+
+# Concurrency
+dashmap.workspace = true
+parking_lot.workspace = true
+
+# Consciousness-specific dependencies
+rand = "0.8"
+ndarray = "0.15"
+candle-core = "0.3"
+candle-nn = "0.3"
+tokenizers = "0.15"
+
+[dev-dependencies]
+tokio-test.workspace = true
+wiremock.workspace = true
+tempfile.workspace = true
+
+[[bin]]
+name = "consciousness-service"
+path = "src/main.rs"

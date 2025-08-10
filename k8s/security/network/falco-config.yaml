@@ -1,0 +1,511 @@
+# Falco Configuration for Consciousness Platform
+# Advanced intrusion detection and runtime security
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: falco-config
+  namespace: falco-system
+  labels:
+    app.kubernetes.io/name: falco
+    app.kubernetes.io/component: config
+data:
+  falco.yaml: |
+    # Falco configuration for Consciousness Platform
+    
+    # Rules files to load
+    rules_file:
+      - /etc/falco/falco_rules.yaml
+      - /etc/falco/falco_rules.local.yaml
+      - /etc/falco/k8s_audit_rules.yaml
+      - /etc/falco/consciousness_rules.yaml
+    
+    # Time format for output
+    time_format_iso_8601: true
+    
+    # JSON output for better parsing
+    json_output: true
+    json_include_output_property: true
+    json_include_tags_property: true
+    
+    # Log level
+    log_level: info
+    log_stderr: true
+    log_syslog: false
+    
+    # Priority threshold
+    priority: debug
+    
+    # Buffered outputs
+    buffered_outputs: false
+    
+    # Outputs configuration
+    outputs:
+      rate: 1
+      max_burst: 1000
+    
+    # Syscall event drops
+    syscall_event_drops:
+      actions:
+        - log
+        - alert
+      rate: 0.03333
+      max_burst: 10
+    
+    # File outputs
+    file_output:
+      enabled: true
+      keep_alive: false
+      filename: /var/log/falco/events.log
+    
+    # Stdout output
+    stdout_output:
+      enabled: true
+    
+    # Syslog output
+    syslog_output:
+      enabled: false
+    
+    # Program output for custom handling
+    program_output:
+      enabled: true
+      keep_alive: true
+      program: |
+        jq -r '
+          if .priority == "Critical" or .priority == "Error" then
+            "ALERT: " + .rule + " - " + .output
+          else
+            .rule + ": " + .output
+          end
+        '
+    
+    # HTTP output for webhook integration
+    http_output:
+      enabled: true
+      url: "http://consciousness-security-webhook:8080/falco-alerts"
+      user_agent: "falco/consciousness-platform"
+    
+    # gRPC output
+    grpc_output:
+      enabled: false
+    
+    # gRPC server
+    grpc:
+      enabled: true
+      bind_address: "0.0.0.0:5060"
+      threadiness: 8
+    
+    # Webserver for health checks
+    webserver:
+      enabled: true
+      listen_port: 8765
+      k8s_healthz_endpoint: /healthz
+      ssl_enabled: false
+    
+    # Kubernetes audit log support
+    k8s_audit_endpoint: /k8s-audit
+    
+    # Modern BPF probe
+    modern_bpf:
+      cpus_for_each_syscall_buffer: 2
+    
+    # Engine configuration
+    engine:
+      kind: modern_bpf
+      modern_bpf:
+        cpus_for_each_syscall_buffer: 2
+    
+    # Load plugins
+    load_plugins: []
+    
+    # Watch config files for changes
+    watch_config_files: true
+
+  consciousness_rules.yaml: |
+    # Custom Falco rules for Consciousness Platform security
+    
+    # Consciousness Engine specific rules
+    - rule: Consciousness Engine Unauthorized Access
+      desc: Detect unauthorized access to consciousness engine
+      condition: >
+        spawned_process and
+        proc.name in (consciousness-engine) and
+        not user.name in (consciousness, root)
+      output: >
+        Unauthorized access to consciousness engine
+        (user=%user.name command=%proc.cmdline container=%container.name)
+      priority: CRITICAL
+      tags: [consciousness, unauthorized_access]
+    
+    - rule: Consciousness Data Exfiltration
+      desc: Detect potential consciousness data exfiltration
+      condition: >
+        open_write and
+        fd.name contains "/consciousness/data" and
+        not proc.name in (consciousness-engine, postgres, vault)
+      output: >
+        Potential consciousness data exfiltration
+        (file=%fd.name process=%proc.name container=%container.name)
+      priority: CRITICAL
+      tags: [consciousness, data_exfiltration]
+    
+    - rule: Consciousness Memory Dump
+      desc: Detect attempts to dump consciousness engine memory
+      condition: >
+        spawned_process and
+        proc.name in (gdb, strace, ltrace, gcore) and
+        proc.args contains "consciousness"
+      output: >
+        Attempt to dump consciousness engine memory
+        (command=%proc.cmdline user=%user.name container=%container.name)
+      priority: CRITICAL
+      tags: [consciousness, memory_dump]
+    
+    # Vault security rules
+    - rule: Vault Unauthorized Access
+      desc: Detect unauthorized access to Vault
+      condition: >
+        spawned_process and
+        container.image.repository contains "vault" and
+        not user.name in (vault, root)
+      output: >
+        Unauthorized access to Vault container
+        (user=%user.name command=%proc.cmdline container=%container.name)
+      priority: CRITICAL
+      tags: [vault, unauthorized_access]
+    
+    - rule: Vault Secret Access
+      desc: Detect direct access to Vault secrets
+      condition: >
+        open_read and
+        fd.name contains "/vault/secrets" and
+        not proc.name in (vault)
+      output: >
+        Direct access to Vault secrets detected
+        (file=%fd.name process=%proc.name container=%container.name)
+      priority: CRITICAL
+      tags: [vault, secret_access]
+    
+    # Network security rules
+    - rule: Consciousness Lateral Movement
+      desc: Detect lateral movement in consciousness network
+      condition: >
+        outbound and
+        fd.sip != "127.0.0.1" and
+        container.name contains "consciousness" and
+        not fd.sport in (8080, 8081, 5432, 6379, 8200)
+      output: >
+        Potential lateral movement from consciousness service
+        (connection=%fd.sip:%fd.sport->%fd.cip:%fd.cport container=%container.name)
+      priority: WARNING
+      tags: [consciousness, lateral_movement]
+    
+    - rule: Consciousness Privilege Escalation
+      desc: Detect privilege escalation in consciousness containers
+      condition: >
+        spawned_process and
+        container.name contains "consciousness" and
+        proc.name in (su, sudo, doas) and
+        not user.name = "root"
+      output: >
+        Privilege escalation attempt in consciousness container
+        (command=%proc.cmdline user=%user.name container=%container.name)
+      priority: CRITICAL
+      tags: [consciousness, privilege_escalation]
+    
+    # File system security
+    - rule: Consciousness Config Modification
+      desc: Detect unauthorized modification of consciousness configuration
+      condition: >
+        open_write and
+        fd.name contains "/app/config" and
+        container.name contains "consciousness" and
+        not proc.name in (consciousness-engine, api-gateway)
+      output: >
+        Unauthorized modification of consciousness configuration
+        (file=%fd.name process=%proc.name container=%container.name)
+      priority: ERROR
+      tags: [consciousness, config_modification]
+    
+    - rule: Consciousness Binary Modification
+      desc: Detect modification of consciousness binaries
+      condition: >
+        open_write and
+        fd.name contains "/app/bin" and
+        container.name contains "consciousness"
+      output: >
+        Modification of consciousness binary detected
+        (file=%fd.name process=%proc.name container=%container.name)
+      priority: CRITICAL
+      tags: [consciousness, binary_modification]
+    
+    # Container security
+    - rule: Consciousness Container Escape
+      desc: Detect container escape attempts from consciousness services
+      condition: >
+        spawned_process and
+        container.name contains "consciousness" and
+        proc.name in (docker, kubectl, crictl, runc) and
+        proc.args contains "exec"
+      output: >
+        Container escape attempt from consciousness service
+        (command=%proc.cmdline container=%container.name)
+      priority: CRITICAL
+      tags: [consciousness, container_escape]
+    
+    - rule: Consciousness Sensitive Mount
+      desc: Detect mounting of sensitive paths in consciousness containers
+      condition: >
+        spawned_process and
+        container.name contains "consciousness" and
+        proc.name = "mount" and
+        (proc.args contains "/proc" or
+         proc.args contains "/sys" or
+         proc.args contains "/dev" or
+         proc.args contains "/var/run/docker.sock")
+      output: >
+        Sensitive path mounted in consciousness container
+        (command=%proc.cmdline container=%container.name)
+      priority: CRITICAL
+      tags: [consciousness, sensitive_mount]
+    
+    # Kubernetes security
+    - rule: Consciousness ServiceAccount Token Access
+      desc: Detect unauthorized access to service account tokens
+      condition: >
+        open_read and
+        fd.name contains "/var/run/secrets/kubernetes.io/serviceaccount/token" and
+        container.name contains "consciousness" and
+        not proc.name in (consciousness-engine, api-gateway, vault)
+      output: >
+        Unauthorized access to service account token
+        (file=%fd.name process=%proc.name container=%container.name)
+      priority: ERROR
+      tags: [consciousness, serviceaccount_token]
+    
+    # Anomaly detection
+    - rule: Consciousness Unusual Network Activity
+      desc: Detect unusual network activity from consciousness services
+      condition: >
+        outbound and
+        container.name contains "consciousness" and
+        fd.sport > 32768 and
+        fd.cport not in (53, 80, 443, 5432, 6379, 8080, 8081, 8200) and
+        not fd.cip in (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16)
+      output: >
+        Unusual network activity from consciousness service
+        (connection=%fd.sip:%fd.sport->%fd.cip:%fd.cport container=%container.name)
+      priority: WARNING
+      tags: [consciousness, unusual_network]
+    
+    - rule: Consciousness High CPU Usage
+      desc: Detect abnormally high CPU usage in consciousness containers
+      condition: >
+        spawned_process and
+        container.name contains "consciousness" and
+        proc.name in (stress, stress-ng, cpulimit, yes)
+      output: >
+        High CPU usage process in consciousness container
+        (process=%proc.name command=%proc.cmdline container=%container.name)
+      priority: WARNING
+      tags: [consciousness, high_cpu]
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: falco-alerts-webhook
+  namespace: falco-system
+  labels:
+    app.kubernetes.io/name: falco
+    app.kubernetes.io/component: webhook
+data:
+  webhook.py: |
+    #!/usr/bin/env python3
+    """
+    Falco alerts webhook for Consciousness Platform
+    Processes Falco alerts and sends notifications
+    """
+    
+    import json
+    import logging
+    import os
+    from datetime import datetime
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+    from urllib.parse import urlparse
+    import requests
+    
+    # Configuration
+    SLACK_WEBHOOK_URL = os.getenv('SLACK_WEBHOOK_URL', '')
+    PAGERDUTY_INTEGRATION_KEY = os.getenv('PAGERDUTY_INTEGRATION_KEY', '')
+    LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
+    
+    # Setup logging
+    logging.basicConfig(
+        level=getattr(logging, LOG_LEVEL),
+        format='%(asctime)s - %(levelname)s - %(message)s'
+    )
+    logger = logging.getLogger(__name__)
+    
+    class FalcoWebhookHandler(BaseHTTPRequestHandler):
+        def do_POST(self):
+            if self.path == '/falco-alerts':
+                self.handle_falco_alert()
+            else:
+                self.send_response(404)
+                self.end_headers()
+        
+        def handle_falco_alert(self):
+            try:
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length)
+                alert_data = json.loads(post_data.decode('utf-8'))
+                
+                logger.info(f"Received Falco alert: {alert_data.get('rule', 'Unknown')}")
+                
+                # Process the alert
+                self.process_alert(alert_data)
+                
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'status': 'ok'}).encode())
+                
+            except Exception as e:
+                logger.error(f"Error processing alert: {e}")
+                self.send_response(500)
+                self.end_headers()
+        
+        def process_alert(self, alert_data):
+            priority = alert_data.get('priority', 'INFO')
+            rule = alert_data.get('rule', 'Unknown Rule')
+            output = alert_data.get('output', 'No details')
+            tags = alert_data.get('tags', [])
+            
+            # Create alert message
+            alert_message = {
+                'timestamp': datetime.utcnow().isoformat(),
+                'priority': priority,
+                'rule': rule,
+                'output': output,
+                'tags': tags,
+                'source': 'falco-consciousness-platform'
+            }
+            
+            # Send to different channels based on priority
+            if priority in ['CRITICAL', 'ERROR']:
+                self.send_to_pagerduty(alert_message)
+                self.send_to_slack(alert_message, urgent=True)
+            elif priority == 'WARNING':
+                self.send_to_slack(alert_message, urgent=False)
+            
+            # Log all alerts
+            logger.warning(f"SECURITY ALERT [{priority}] {rule}: {output}")
+        
+        def send_to_slack(self, alert, urgent=False):
+            if not SLACK_WEBHOOK_URL:
+                return
+            
+            try:
+                color = '#ff0000' if urgent else '#ffaa00'
+                emoji = ':rotating_light:' if urgent else ':warning:'
+                
+                slack_message = {
+                    'attachments': [{
+                        'color': color,
+                        'title': f"{emoji} Consciousness Platform Security Alert",
+                        'fields': [
+                            {
+                                'title': 'Rule',
+                                'value': alert['rule'],
+                                'short': True
+                            },
+                            {
+                                'title': 'Priority',
+                                'value': alert['priority'],
+                                'short': True
+                            },
+                            {
+                                'title': 'Details',
+                                'value': alert['output'],
+                                'short': False
+                            },
+                            {
+                                'title': 'Tags',
+                                'value': ', '.join(alert['tags']),
+                                'short': True
+                            },
+                            {
+                                'title': 'Timestamp',
+                                'value': alert['timestamp'],
+                                'short': True
+                            }
+                        ]
+                    }]
+                }
+                
+                response = requests.post(SLACK_WEBHOOK_URL, json=slack_message, timeout=10)
+                response.raise_for_status()
+                logger.info("Alert sent to Slack successfully")
+                
+            except Exception as e:
+                logger.error(f"Failed to send alert to Slack: {e}")
+        
+        def send_to_pagerduty(self, alert):
+            if not PAGERDUTY_INTEGRATION_KEY:
+                return
+            
+            try:
+                pagerduty_event = {
+                    'routing_key': PAGERDUTY_INTEGRATION_KEY,
+                    'event_action': 'trigger',
+                    'payload': {
+                        'summary': f"Consciousness Platform Security Alert: {alert['rule']}",
+                        'source': 'falco-consciousness-platform',
+                        'severity': 'critical' if alert['priority'] == 'CRITICAL' else 'error',
+                        'component': 'consciousness-platform',
+                        'group': 'security',
+                        'class': 'runtime-security',
+                        'custom_details': {
+                            'rule': alert['rule'],
+                            'output': alert['output'],
+                            'tags': alert['tags'],
+                            'timestamp': alert['timestamp']
+                        }
+                    }
+                }
+                
+                response = requests.post(
+                    'https://events.pagerduty.com/v2/enqueue',
+                    json=pagerduty_event,
+                    timeout=10
+                )
+                response.raise_for_status()
+                logger.info("Alert sent to PagerDuty successfully")
+                
+            except Exception as e:
+                logger.error(f"Failed to send alert to PagerDuty: {e}")
+    
+    def run_server():
+        server_address = ('', 8080)
+        httpd = HTTPServer(server_address, FalcoWebhookHandler)
+        logger.info("Falco webhook server starting on port 8080")
+        httpd.serve_forever()
+    
+    if __name__ == '__main__':
+        run_server()
+
+  Dockerfile: |
+    FROM python:3.11-slim
+    
+    WORKDIR /app
+    
+    RUN pip install requests
+    
+    COPY webhook.py .
+    
+    RUN chmod +x webhook.py
+    
+    EXPOSE 8080
+    
+    CMD ["python", "webhook.py"]

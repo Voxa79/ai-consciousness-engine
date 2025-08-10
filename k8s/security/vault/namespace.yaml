@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: vault
+  labels:
+    name: vault
+    app.kubernetes.io/name: vault
+    app.kubernetes.io/instance: vault
+    app.kubernetes.io/component: security
+    consciousness-engine.com/tier: security
+    consciousness-engine.com/environment: production
+  annotations:
+    consciousness-engine.com/description: "HashiCorp Vault for secrets management"
+    consciousness-engine.com/owner: "platform-team"
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vault
+  namespace: vault
+  labels:
+    app.kubernetes.io/name: vault
+    app.kubernetes.io/instance: vault
+    app.kubernetes.io/component: security
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::ACCOUNT_ID:role/consciousness-engine-vault-role"
+automountServiceAccountToken: true

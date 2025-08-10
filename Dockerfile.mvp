@@ -1,0 +1,47 @@
+# Multi-stage Dockerfile for MVP
+FROM node:18-alpine AS web-builder
+
+# Build Web UI
+WORKDIR /app/web-ui
+COPY web-ui/package*.json ./
+RUN npm install
+COPY web-ui/ ./
+RUN npm run build
+
+FROM rust:1.70 AS rust-builder
+
+# Build Consciousness Engine
+WORKDIR /app
+COPY consciousness-engine/ ./consciousness-engine/
+WORKDIR /app/consciousness-engine
+RUN cargo build --release --bin consciousness-server
+
+# Build API Gateway
+WORKDIR /app
+COPY api-gateway/ ./api-gateway/
+WORKDIR /app/api-gateway
+RUN cargo build --release
+
+FROM ubuntu:22.04
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    nginx \
+    supervisor \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy built applications
+COPY --from=rust-builder /app/consciousness-engine/target/release/consciousness-server /usr/local/bin/
+COPY --from=rust-builder /app/api-gateway/target/release/api-gateway /usr/local/bin/
+COPY --from=web-builder /app/web-ui/build /var/www/html/
+
+# Copy configuration files
+COPY docker/nginx.conf /etc/nginx/nginx.conf
+COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Expose ports
+EXPOSE 80 3000 8080
+
+# Start supervisor
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

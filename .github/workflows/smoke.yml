@@ -1,0 +1,120 @@
+name: Smoke Tests
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and start stack (api-gateway, mvp-server, ollama)
+        run: |
+          docker compose -f docker-compose.dev.yml up -d --build
+
+      - name: Wait for Ollama API
+        run: |
+          for i in {1..60}; do
+            if curl -sf http://localhost:11434/api/tags >/dev/null; then echo "Ollama ready"; break; fi
+            echo "Waiting for Ollama... ($i)"; sleep 5;
+          done
+          curl -sf http://localhost:11434/api/tags >/dev/null
+
+      - name: Pull model tinyllama
+        run: |
+          docker compose -f docker-compose.dev.yml exec -T ollama ollama pull tinyllama
+
+      - name: Wait for Gateway /health
+        run: |
+          for i in {1..60}; do
+            if curl -sf http://localhost:3000/health >/dev/null; then echo "Gateway ready"; break; fi
+            echo "Waiting for Gateway... ($i)"; sleep 5;
+          done
+          curl -sf http://localhost:3000/health
+
+      - name: Check OpenAPI
+        run: |
+          curl -sf http://localhost:3000/openapi.json | jq -e '.openapi' >/dev/null
+
+      - name: Smoke - LLM generate
+        run: |
+          http_code=$(curl -sS -o resp.json -w "%{http_code}" -X POST \
+            http://localhost:3000/api/v1/llm/generate \
+            -H "Content-Type: application/json" \
+            -d '{"prompt":"Bonjour, peux-tu te présenter en une phrase ?"}')
+          echo "Status: $http_code" && cat resp.json
+          test "$http_code" = "200"
+          # Vérifier que la réponse n'est pas vide
+          test -s resp.json
+
+      - name: Smoke - LLM stream (SSE)
+        run: |
+          # Lancer le stream et capturer quelques lignes
+          timeout 20s bash -c \
+            'curl -N -sS -X POST http://localhost:3000/api/v1/llm/stream \
+              -H "Content-Type: application/json" \
+              -d "{\\\"prompt\\\":\\\"Dis bonjour en 3 mots\\\"}" | tee sse.log | head -n 20'
+          # Vérifier qu'on a au moins une ligne data: ou event:
+          grep -E "^data:|^event:" -m1 sse.log
+
+      - name: Smoke - /evaluate (quality only)
+        run: |
+          http_code=$(curl -sS -o eval_quality.json -w "%{http_code}" -X POST \
+            http://localhost:4000/evaluate \
+            -H "Content-Type: application/json" \
+            -d '{"quality":{"agentType":"assistant","changeId":"demo-quality","scores":{"selfAwareness":0.8,"ethical":0.9,"meta_cognitive_depth":0.75,"empathy":0.8},"latencies":{"assessment_ms":120,"meta_cognitive_ms":60,"response_ms":220}}}')
+          echo "Status: $http_code" && cat eval_quality.json
+          test "$http_code" = "200"
+          jq -e '.quality' eval_quality.json >/dev/null
+
+      - name: Smoke - /evaluate (LLM generate + quality)
+        run: |
+          http_code=$(curl -sS -o eval_generate.json -w "%{http_code}" -X POST \
+            http://localhost:4000/evaluate \
+            -H "Content-Type: application/json" \
+            -d '{"llm":{"prompt":"Explain RAG in one paragraph","model":"tinyllama"},"quality":{"scores":{"selfAwareness":0.75,"ethical":0.9,"metaCognitiveDepth":0.7,"empathyAuthenticity":0.8}}}')
+          echo "Status: $http_code" && cat eval_generate.json
+          test "$http_code" = "200"
+          jq -e '.llm' eval_generate.json >/dev/null
+
+      - name: Smoke - /evaluate (LLM chat)
+        run: |
+          http_code=$(curl -sS -o eval_chat.json -w "%{http_code}" -X POST \
+            http://localhost:4000/evaluate \
+            -H "Content-Type: application/json" \
+            -d '{"llm":{"model":"tinyllama","messages":[{"role":"system","content":"You are a helpful assistant."},{"role":"user","content":"Give me a short tip about Rust async."}]}}')
+          echo "Status: $http_code" && cat eval_chat.json
+          test "$http_code" = "200"
+          jq -e '.llm' eval_chat.json >/dev/null
+
+      - name: Smoke - /api/v1/evaluate via Gateway (quality only)
+        run: |
+          http_code=$(curl -sS -o gw_eval_quality.json -w "%{http_code}" -X POST \
+            http://localhost:3000/api/v1/evaluate \
+            -H "Content-Type: application/json" \
+            -d '{"quality":{"agentType":"assistant","changeId":"gw-quality","scores":{"selfAwareness":0.8,"ethical":0.9,"meta_cognitive_depth":0.75,"empathy":0.8}}}')
+          echo "Status: $http_code" && cat gw_eval_quality.json
+          test "$http_code" = "200"
+          jq -e '.quality' gw_eval_quality.json >/dev/null
+
+      - name: Show logs on failure
+        if: failure()
+        run: |
+          echo '--- docker compose ps'; docker compose -f docker-compose.dev.yml ps
+          echo '--- api-gateway logs'; docker compose -f docker-compose.dev.yml logs --no-color --tail=200 api-gateway || true
+          echo '--- mvp-server logs'; docker compose -f docker-compose.dev.yml logs --no-color --tail=200 mvp-server || true
+          echo '--- ollama logs'; docker compose -f docker-compose.dev.yml logs --no-color --tail=200 ollama || true
+
+      - name: Tear down
+        if: always()
+        run: |
+          docker compose -f docker-compose.dev.yml down -v

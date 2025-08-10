@@ -1,0 +1,226 @@
+version: '3.8'
+
+services:
+  # Database
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: consciousness
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secure_password_123}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backups:/backups
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    command: redis-server --requirepass ${REDIS_PASSWORD:-secure_redis_123}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # Ollama AI
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama_models:/root/.ollama
+    ports:
+      - "11434:11434"
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 60s
+      timeout: 30s
+      retries: 3
+    restart: unless-stopped
+
+  # Consciousness Engine (Rust)
+  consciousness-engine:
+    build:
+      context: ./rust-services/consciousness-engine
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-secure_password_123}@postgres:5432/consciousness
+      REDIS_URL: redis://:${REDIS_PASSWORD:-secure_redis_123}@redis:6379
+      OLLAMA_URL: http://ollama:11434
+      RUST_LOG: info
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: ./rust-services/api-gateway
+      dockerfile: Dockerfile
+    environment:
+      CONSCIOUSNESS_ENGINE_URL: http://consciousness-engine:8080
+      USER_SERVICE_URL: http://user-service:8081
+      JWT_SECRET: ${JWT_SECRET:-super_secure_jwt_secret_key_123}
+      RUST_LOG: info
+    ports:
+      - "3000:3000"
+    depends_on:
+      consciousness-engine:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # User Service
+  user-service:
+    build:
+      context: ./rust-services/user-service
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-secure_password_123}@postgres:5432/consciousness
+      REDIS_URL: redis://:${REDIS_PASSWORD:-secure_redis_123}@redis:6379
+      JWT_SECRET: ${JWT_SECRET:-super_secure_jwt_secret_key_123}
+      RUST_LOG: info
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # Frontend Interface
+  frontend:
+    build:
+      context: ./web-ui
+      dockerfile: Dockerfile.production
+    environment:
+      API_BASE_URL: http://api-gateway:3000
+    ports:
+      - "3001:80"
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Monitoring - Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+
+  # Monitoring - Grafana
+  grafana:
+    image: grafana/grafana:latest
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin123}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    ports:
+      - "3002:3000"
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+  # Log Management - Elasticsearch
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    restart: unless-stopped
+
+  # Log Management - Kibana
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    restart: unless-stopped
+
+  # Backup Service
+  backup:
+    image: postgres:15-alpine
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-secure_password_123}
+    volumes:
+      - ./backups:/backups
+      - ./scripts/backup.sh:/backup.sh
+    command: |
+      sh -c "
+        chmod +x /backup.sh
+        while true; do
+          /backup.sh
+          sleep 86400
+        done
+      "
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  ollama_models:
+  prometheus_data:
+  grafana_data:
+  elasticsearch_data:
+
+networks:
+  default:
+    driver: bridge

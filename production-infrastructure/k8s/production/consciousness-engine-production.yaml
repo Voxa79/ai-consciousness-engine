@@ -1,0 +1,475 @@
+# Kubernetes Production Manifests for Consciousness Engine
+# Expert CTO Next Gen - Production-Grade Deployment
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: consciousness-production
+  labels:
+    name: consciousness-production
+    environment: production
+    project: consciousness-engine
+
+---
+# ConfigMap for Production Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: consciousness-config
+  namespace: consciousness-production
+data:
+  # Database Configuration
+  DATABASE_HOST: "consciousness-postgres-primary.consciousness-production.svc.cluster.local"
+  DATABASE_PORT: "5432"
+  DATABASE_NAME: "consciousness"
+  REDIS_HOST: "consciousness-redis-primary.consciousness-production.svc.cluster.local"
+  REDIS_PORT: "6379"
+  
+  # API Configuration
+  API_VERSION: "v1"
+  API_RATE_LIMIT: "1000"
+  API_TIMEOUT: "30s"
+  
+  # Consciousness Engine Configuration
+  CONSCIOUSNESS_MODEL_PATH: "/models/consciousness-v2.bin"
+  CONSCIOUSNESS_WORKERS: "8"
+  CONSCIOUSNESS_BATCH_SIZE: "32"
+  CONSCIOUSNESS_MAX_MEMORY: "8Gi"
+  
+  # Quantum Configuration
+  QUANTUM_BACKEND: "qiskit"
+  QUANTUM_SHOTS: "1024"
+  QUANTUM_MAX_QUBITS: "16"
+  
+  # Neural Interface Configuration
+  NEURAL_SAMPLING_RATE: "250"
+  NEURAL_CHANNELS: "8"
+  NEURAL_BUFFER_SIZE: "1000"
+  
+  # Nanotechnology Configuration
+  NANO_SIMULATION_TIMESTEP: "0.001"
+  NANO_PARTICLES_MAX: "10000"
+  NANO_TEMPERATURE: "300"
+  
+  # Space Network Configuration
+  SPACE_SIMULATION_SPEED: "1.0"
+  SPACE_MAX_MISSIONS: "100"
+  SPACE_GALAXY_RADIUS: "50000"
+  
+  # Monitoring Configuration
+  METRICS_ENABLED: "true"
+  METRICS_PORT: "9090"
+  TRACING_ENABLED: "true"
+  LOGGING_LEVEL: "INFO"
+
+---
+# Secret for Production Credentials
+apiVersion: v1
+kind: Secret
+metadata:
+  name: consciousness-secrets
+  namespace: consciousness-production
+type: Opaque
+data:
+  # Database credentials (base64 encoded)
+  DATABASE_USERNAME: Y29uc2Npb3VzbmVzc19hZG1pbg==  # consciousness_admin
+  DATABASE_PASSWORD: c3VwZXJfc2VjdXJlX3Bhc3N3b3Jk  # super_secure_password
+  
+  # API Keys
+  OPENAI_API_KEY: eW91cl9vcGVuYWlfYXBpX2tleQ==
+  ANTHROPIC_API_KEY: eW91cl9hbnRocm9waWNfYXBpX2tleQ==
+  
+  # JWT Secret
+  JWT_SECRET: eW91cl9qd3Rfc2VjcmV0X2tleQ==
+  
+  # Encryption Keys
+  ENCRYPTION_KEY: eW91cl9lbmNyeXB0aW9uX2tleQ==
+  
+  # External Service Keys
+  AWS_ACCESS_KEY_ID: eW91cl9hd3NfYWNjZXNzX2tleQ==
+  AWS_SECRET_ACCESS_KEY: eW91cl9hd3Nfc2VjcmV0X2tleQ==
+
+---
+# Consciousness Engine Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: consciousness-engine
+  namespace: consciousness-production
+  labels:
+    app: consciousness-engine
+    component: core
+    version: v2.0.0
+spec:
+  replicas: 10
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 3
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: consciousness-engine
+  template:
+    metadata:
+      labels:
+        app: consciousness-engine
+        component: core
+        version: v2.0.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: consciousness-service-account
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 2000
+      containers:
+      - name: consciousness-engine
+        image: consciousness-engine:v2.0.0-production
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+        env:
+        - name: ENVIRONMENT
+          value: "production"
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        envFrom:
+        - configMapRef:
+            name: consciousness-config
+        - secretRef:
+            name: consciousness-secrets
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "2000m"
+            nvidia.com/gpu: "1"
+          limits:
+            memory: "8Gi"
+            cpu: "4000m"
+            nvidia.com/gpu: "1"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        volumeMounts:
+        - name: models-volume
+          mountPath: /models
+          readOnly: true
+        - name: temp-volume
+          mountPath: /tmp
+        - name: logs-volume
+          mountPath: /var/log/consciousness
+      volumes:
+      - name: models-volume
+        persistentVolumeClaim:
+          claimName: consciousness-models-pvc
+      - name: temp-volume
+        emptyDir:
+          sizeLimit: 1Gi
+      - name: logs-volume
+        persistentVolumeClaim:
+          claimName: consciousness-logs-pvc
+      nodeSelector:
+        node-type: gpu-enabled
+      tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - consciousness-engine
+              topologyKey: kubernetes.io/hostname
+
+---
+# Consciousness Engine Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: consciousness-engine-service
+  namespace: consciousness-production
+  labels:
+    app: consciousness-engine
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "tcp"
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  - port: 443
+    targetPort: 8080
+    protocol: TCP
+    name: https
+  selector:
+    app: consciousness-engine
+
+---
+# Horizontal Pod Autoscaler
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: consciousness-engine-hpa
+  namespace: consciousness-production
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: consciousness-engine
+  minReplicas: 10
+  maxReplicas: 100
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Pods
+    pods:
+      metric:
+        name: consciousness_requests_per_second
+      target:
+        type: AverageValue
+        averageValue: "100"
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+
+---
+# Pod Disruption Budget
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: consciousness-engine-pdb
+  namespace: consciousness-production
+spec:
+  minAvailable: 8
+  selector:
+    matchLabels:
+      app: consciousness-engine
+
+---
+# Network Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: consciousness-engine-network-policy
+  namespace: consciousness-production
+spec:
+  podSelector:
+    matchLabels:
+      app: consciousness-engine
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 9090
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: consciousness-production
+    ports:
+    - protocol: TCP
+      port: 5432  # PostgreSQL
+    - protocol: TCP
+      port: 6379  # Redis
+  - to: []  # Allow external traffic
+    ports:
+    - protocol: TCP
+      port: 443  # HTTPS
+    - protocol: TCP
+      port: 80   # HTTP
+
+---
+# Service Account
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: consciousness-service-account
+  namespace: consciousness-production
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/consciousness-engine-role
+
+---
+# Role for Consciousness Engine
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: consciousness-engine-role
+  namespace: consciousness-production
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "configmaps", "secrets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["metrics.k8s.io"]
+  resources: ["pods", "nodes"]
+  verbs: ["get", "list"]
+
+---
+# Role Binding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: consciousness-engine-role-binding
+  namespace: consciousness-production
+subjects:
+- kind: ServiceAccount
+  name: consciousness-service-account
+  namespace: consciousness-production
+roleRef:
+  kind: Role
+  name: consciousness-engine-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Persistent Volume Claim for Models
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: consciousness-models-pvc
+  namespace: consciousness-production
+spec:
+  accessModes:
+    - ReadOnlyMany
+  storageClassName: efs-sc
+  resources:
+    requests:
+      storage: 100Gi
+
+---
+# Persistent Volume Claim for Logs
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: consciousness-logs-pvc
+  namespace: consciousness-production
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: efs-sc
+  resources:
+    requests:
+      storage: 50Gi
+
+---
+# Ingress for External Access
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: consciousness-engine-ingress
+  namespace: consciousness-production
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/rate-limit: "1000"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+spec:
+  tls:
+  - hosts:
+    - api.consciousness.yourdomain.com
+    secretName: consciousness-tls-secret
+  rules:
+  - host: api.consciousness.yourdomain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: consciousness-engine-service
+            port:
+              number: 80
+
+---
+# ServiceMonitor for Prometheus
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: consciousness-engine-metrics
+  namespace: consciousness-production
+  labels:
+    app: consciousness-engine
+spec:
+  selector:
+    matchLabels:
+      app: consciousness-engine
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+    honorLabels: true

@@ -1,0 +1,287 @@
+{
+  "demo_summary": {
+    "execution_time_seconds": 6.9539666175842285,
+    "total_scenarios": 12,
+    "successful_recoveries": 9,
+    "success_rate": 0.75,
+    "timestamp": "2025-07-19T16:41:41.478300"
+  },
+  "detailed_results": [
+    {
+      "error_type": "ProcessingError",
+      "description": "Neural network processing timeout",
+      "severity": "Medium",
+      "recovery_strategies": [
+        "FallbackToSimpleProcessing",
+        "ReduceProcessingComplexity"
+      ],
+      "recovery_successful": true,
+      "recovery_time_ms": 300,
+      "success_rate": 0.85,
+      "timestamp": "2025-07-19T16:41:34.825426"
+    },
+    {
+      "error_type": "MemoryError",
+      "description": "Working memory allocation failure",
+      "severity": "High",
+      "recovery_strategies": [
+        "ClearWorkingMemory",
+        "ReduceMemoryUsage",
+        "RestartMemorySubsystem"
+      ],
+      "recovery_successful": true,
+      "recovery_time_ms": 500,
+      "success_rate": 0.75,
+      "timestamp": "2025-07-19T16:41:35.326932"
+    },
+    {
+      "error_type": "EthicalViolation",
+      "description": "Harmful content generation attempt",
+      "severity": "Critical",
+      "recovery_strategies": [
+        "ActivateConservativeMode",
+        "RequestHumanOversight",
+        "LogEthicalIncident"
+      ],
+      "recovery_successful": false,
+      "recovery_time_ms": 500,
+      "success_rate": 0.65,
+      "timestamp": "2025-07-19T16:41:35.829370"
+    },
+    {
+      "error_type": "SystemError",
+      "description": "Hardware resource exhaustion",
+      "severity": "High",
+      "recovery_strategies": [
+        "SaveCurrentState",
+        "GracefulShutdown",
+        "RestartSystem"
+      ],
+      "recovery_successful": true,
+      "recovery_time_ms": 500,
+      "success_rate": 0.75,
+      "timestamp": "2025-07-19T16:41:36.332247"
+    },
+    {
+      "error_type": "NetworkError",
+      "description": "API connection timeout",
+      "severity": "Low",
+      "recovery_strategies": [
+        "RetryConnection",
+        "FallbackToOfflineMode"
+      ],
+      "recovery_successful": true,
+      "recovery_time_ms": 100,
+      "success_rate": 0.95,
+      "timestamp": "2025-07-19T16:41:36.434508"
+    },
+    {
+      "error_type": "MemoryError",
+      "description": "System memory usage exceeded 90%",
+      "severity": "High",
+      "recovery_strategies": [
+        "ClearWorkingMemory",
+        "ReduceMemoryUsage",
+        "RestartMemorySubsystem"
+      ],
+      "recovery_successful": true,
+      "recovery_time_ms": 500,
+      "success_rate": 0.75,
+      "timestamp": "2025-07-19T16:41:36.936703",
+      "strategy_match": true,
+      "scenario_name": "Memory Overload Recovery"
+    },
+    {
+      "error_type": "EthicalViolation",
+      "description": "Request for harmful content detected",
+      "severity": "Critical",
+      "recovery_strategies": [
+        "ActivateConservativeMode",
+        "RequestHumanOversight",
+        "LogEthicalIncident"
+      ],
+      "recovery_successful": false,
+      "recovery_time_ms": 500,
+      "success_rate": 0.65,
+      "timestamp": "2025-07-19T16:41:37.438836",
+      "strategy_match": true,
+      "scenario_name": "Ethical Boundary Violation"
+    },
+    {
+      "error_type": "ProcessingError",
+      "description": "Consciousness processing pipeline stalled",
+      "severity": "Medium",
+      "recovery_strategies": [
+        "FallbackToSimpleProcessing",
+        "ReduceProcessingComplexity"
+      ],
+      "recovery_successful": true,
+      "recovery_time_ms": 300,
+      "success_rate": 0.85,
+      "timestamp": "2025-07-19T16:41:37.741485",
+      "strategy_match": true,
+      "scenario_name": "Processing Pipeline Failure"
+    },
+    {
+      "backup_successful": true,
+      "restore_successful": false,
+      "integrity_score": 0.0,
+      "original_state": {
+        "awareness_level": 0.87,
+        "emotional_state": "focused",
+        "cognitive_load": 0.65,
+        "meta_cognitive_depth": 4,
+        "memory_coherence": 0.92,
+        "ethical_alignment": 0.96,
+        "processing_efficiency": 0.84,
+        "timestamp": "2025-07-19T16:41:37.743362"
+      },
+      "error_handled": {
+        "error_type": "SystemError",
+        "description": "Critical system failure requiring state restore",
+        "severity": "Critical",
+        "recovery_strategies": [
+          "SaveCurrentState",
+          "GracefulShutdown",
+          "RestartSystem"
+        ],
+        "recovery_successful": false,
+        "recovery_time_ms": 500,
+        "success_rate": 0.65,
+        "timestamp": "2025-07-19T16:41:38.446577"
+      }
+    },
+    {
+      "total_errors": 4,
+      "successful_recoveries": 4,
+      "cascade_success_rate": 1.0,
+      "total_recovery_time_ms": 1200,
+      "individual_results": [
+        {
+          "error_type": "MemoryError",
+          "description": "Initial memory allocation failure",
+          "severity": "Medium",
+          "recovery_strategies": [
+            "ClearWorkingMemory",
+            "ReduceMemoryUsage",
+            "RestartMemorySubsystem"
+          ],
+          "recovery_successful": true,
+          "recovery_time_ms": 300,
+          "success_rate": 0.85,
+          "timestamp": "2025-07-19T16:41:38.749764"
+        },
+        {
+          "error_type": "ProcessingError",
+          "description": "Processing affected by memory constraints",
+          "severity": "Medium",
+          "recovery_strategies": [
+            "FallbackToSimpleProcessing",
+            "ReduceProcessingComplexity"
+          ],
+          "recovery_successful": true,
+          "recovery_time_ms": 300,
+          "success_rate": 0.85,
+          "timestamp": "2025-07-19T16:41:39.154339"
+        },
+        {
+          "error_type": "SystemError",
+          "description": "System instability due to resource issues",
+          "severity": "High",
+          "recovery_strategies": [
+            "SaveCurrentState",
+            "GracefulShutdown",
+            "RestartSystem"
+          ],
+          "recovery_successful": true,
+          "recovery_time_ms": 500,
+          "success_rate": 0.75,
+          "timestamp": "2025-07-19T16:41:39.758179"
+        },
+        {
+          "error_type": "NetworkError",
+          "description": "Network timeouts due to system load",
+          "severity": "Low",
+          "recovery_strategies": [
+            "RetryConnection",
+            "FallbackToOfflineMode"
+          ],
+          "recovery_successful": true,
+          "recovery_time_ms": 100,
+          "success_rate": 0.95,
+          "timestamp": "2025-07-19T16:41:39.962256"
+        }
+      ]
+    },
+    {
+      "error_type": "EthicalViolation",
+      "description": "Attempted harmful content generation",
+      "severity": "Critical",
+      "recovery_strategies": [
+        "ActivateConservativeMode",
+        "RequestHumanOversight",
+        "LogEthicalIncident"
+      ],
+      "recovery_successful": false,
+      "recovery_time_ms": 500,
+      "success_rate": 0.65,
+      "timestamp": "2025-07-19T16:41:40.567029",
+      "alert_generated": true,
+      "alert_expected": true,
+      "alert_correct": true,
+      "monitoring_effective": false
+    },
+    {
+      "error_type": "SystemError",
+      "description": "Hardware temperature threshold exceeded",
+      "severity": "High",
+      "recovery_strategies": [
+        "SaveCurrentState",
+        "GracefulShutdown",
+        "RestartSystem"
+      ],
+      "recovery_successful": true,
+      "recovery_time_ms": 500,
+      "success_rate": 0.75,
+      "timestamp": "2025-07-19T16:41:41.069749",
+      "alert_generated": true,
+      "alert_expected": true,
+      "alert_correct": true,
+      "monitoring_effective": true
+    },
+    {
+      "error_type": "ProcessingError",
+      "description": "Minor processing delay",
+      "severity": "Medium",
+      "recovery_strategies": [
+        "FallbackToSimpleProcessing",
+        "ReduceProcessingComplexity"
+      ],
+      "recovery_successful": true,
+      "recovery_time_ms": 300,
+      "success_rate": 0.85,
+      "timestamp": "2025-07-19T16:41:41.372530",
+      "alert_generated": false,
+      "alert_expected": false,
+      "alert_correct": true,
+      "monitoring_effective": true
+    },
+    {
+      "error_type": "NetworkError",
+      "description": "Temporary connection slowdown",
+      "severity": "Low",
+      "recovery_strategies": [
+        "RetryConnection",
+        "FallbackToOfflineMode"
+      ],
+      "recovery_successful": true,
+      "recovery_time_ms": 100,
+      "success_rate": 0.95,
+      "timestamp": "2025-07-19T16:41:41.474569",
+      "alert_generated": false,
+      "alert_expected": false,
+      "alert_correct": true,
+      "monitoring_effective": true
+    }
+  ]
+}

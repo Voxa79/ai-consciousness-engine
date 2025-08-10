@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  consciousness-engine:
+    build:
+      context: ./consciousness-engine
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - RUST_LOG=info
+      - PORT=8080
+    networks:
+      - consciousness-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    ports:
+      - "3002:3000"
+    environment:
+      - CONSCIOUSNESS_ENGINE_URL=http://consciousness-engine:8080
+      - RUST_LOG=info
+      - PORT=3000
+    depends_on:
+      consciousness-engine:
+        condition: service_healthy
+    networks:
+      - consciousness-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  web-ui:
+    build:
+      context: ./web-ui
+      dockerfile: Dockerfile
+    ports:
+      - "3001:80"
+    environment:
+      - REACT_APP_API_URL=http://localhost:3002/api/v1
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    networks:
+      - consciousness-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+networks:
+  consciousness-network:
+    driver: bridge

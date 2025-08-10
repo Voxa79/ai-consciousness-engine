@@ -1,0 +1,65 @@
+# Normalisation des fins de ligne et encodage
+# Convertit automatiquement les fichiers texte en LF dans le repo
+* text=auto eol=lf
+
+# Force l'encodage UTF-8 pour les fichiers texte courants
+*.md         text working-tree-encoding=UTF-8
+*.txt        text working-tree-encoding=UTF-8
+*.json       text working-tree-encoding=UTF-8
+*.jsonc      text working-tree-encoding=UTF-8
+*.yaml       text working-tree-encoding=UTF-8
+*.yml        text working-tree-encoding=UTF-8
+*.toml       text working-tree-encoding=UTF-8
+*.ini        text working-tree-encoding=UTF-8
+*.cfg        text working-tree-encoding=UTF-8
+*.conf       text working-tree-encoding=UTF-8
+*.env        text working-tree-encoding=UTF-8
+*.html       text working-tree-encoding=UTF-8
+*.htm        text working-tree-encoding=UTF-8
+*.css        text working-tree-encoding=UTF-8
+*.scss       text working-tree-encoding=UTF-8
+*.sass       text working-tree-encoding=UTF-8
+*.less       text working-tree-encoding=UTF-8
+*.js         text working-tree-encoding=UTF-8
+*.mjs        text working-tree-encoding=UTF-8
+*.cjs        text working-tree-encoding=UTF-8
+*.ts         text working-tree-encoding=UTF-8
+*.tsx        text working-tree-encoding=UTF-8
+*.jsx        text working-tree-encoding=UTF-8
+*.py         text working-tree-encoding=UTF-8
+*.rs         text working-tree-encoding=UTF-8
+*.go         text working-tree-encoding=UTF-8
+*.java       text working-tree-encoding=UTF-8
+*.cs         text working-tree-encoding=UTF-8
+*.sh         text working-tree-encoding=UTF-8
+*.bash       text working-tree-encoding=UTF-8
+*.ps1        text working-tree-encoding=UTF-8
+*.psm1       text working-tree-encoding=UTF-8
+*.psd1       text working-tree-encoding=UTF-8
+*.xml        text working-tree-encoding=UTF-8
+*.svg        text working-tree-encoding=UTF-8
+*.mdx        text working-tree-encoding=UTF-8
+
+# Marque certains types comme binaires (pas de normalisation)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.tar.gz binary
+*.rar binary
+*.7z binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+
+# Evite les diffs sur les verrous ou bases
+*.lock binary
+*.db binary
+
+# Optionnel: aide à GitHub Linguist si nécessaire
+# docs/* linguist-documentation

@@ -1,0 +1,15 @@
+{
+  "name": "ultravox-adapter",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "ws": "^8.18.0",
+    "eventsource-parser": "^1.1.2"
+  }
+}

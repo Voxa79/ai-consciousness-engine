@@ -1,0 +1,188 @@
+# Docker Compose pour développement UI avec Mock API
+# Expert CTO Next Gen - Environnement de développement isolé
+
+version: '3.8'
+
+services:
+  # Mock Consciousness Engine pour développement
+  mock-consciousness-engine:
+    image: node:18-alpine
+    container_name: mock-consciousness-engine
+    working_dir: /app
+    volumes:
+      - ./mock-services:/app
+    ports:
+      - "8080:8080"
+    environment:
+      - NODE_ENV=development
+      - PORT=8080
+    command: >
+      sh -c "
+        npm init -y &&
+        npm install express cors &&
+        node mock-consciousness-api.js
+      "
+    networks:
+      - dev-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Mock API Gateway pour développement
+  mock-api-gateway:
+    image: node:18-alpine
+    container_name: mock-api-gateway
+    working_dir: /app
+    volumes:
+      - ./mock-services:/app
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - CONSCIOUSNESS_ENGINE_URL=http://mock-consciousness-engine:8080
+    command: >
+      sh -c "
+        npm init -y &&
+        npm install express cors http-proxy-middleware &&
+        node mock-api-gateway.js
+      "
+    depends_on:
+      mock-consciousness-engine:
+        condition: service_healthy
+    networks:
+      - dev-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Interface Web UI en développement
+  web-ui-dev:
+    build:
+      context: ./web-ui
+      dockerfile: Dockerfile.dev
+    container_name: consciousness-web-ui-dev
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - REACT_APP_API_URL=http://localhost:3000
+      - REACT_APP_PRODUCTION_MODE=false
+      - CHOKIDAR_USEPOLLING=true
+      - FAST_REFRESH=true
+      - WDS_HOT=true
+      - PORT=3001
+    volumes:
+      - ./web-ui/src:/app/src
+      - ./web-ui/public:/app/public
+      - ./web-ui/package.json:/app/package.json
+      - web_ui_node_modules:/app/node_modules
+    depends_on:
+      mock-api-gateway:
+        condition: service_healthy
+    networks:
+      - dev-network
+    stdin_open: true
+    tty: true
+
+  # Nginx pour routage en développement
+  nginx-dev:
+    image: nginx:alpine
+    container_name: consciousness-nginx-dev
+    ports:
+      - "80:80"
+    volumes:
+      - ./docker/nginx-dev.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - web-ui-dev
+      - mock-api-gateway
+    networks:
+      - dev-network
+
+  # Redis pour cache de développement
+  redis-dev:
+    image: redis:7-alpine
+    container_name: consciousness-redis-dev
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_dev_data:/data
+    networks:
+      - dev-network
+
+  # PostgreSQL pour développement
+  postgres-dev:
+    image: postgres:15-alpine
+    container_name: consciousness-postgres-dev
+    environment:
+      POSTGRES_DB: consciousness_dev
+      POSTGRES_USER: consciousness
+      POSTGRES_PASSWORD: dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./database/init-dev.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - dev-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U consciousness"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Monitoring de développement
+  prometheus-dev:
+    image: prom/prometheus:latest
+    container_name: consciousness-prometheus-dev
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus-dev.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_dev_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=24h'
+      - '--web.enable-lifecycle'
+    networks:
+      - dev-network
+
+  # Grafana pour visualisation
+  grafana-dev:
+    image: grafana/grafana:latest
+    container_name: consciousness-grafana-dev
+    ports:
+      - "3002:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=dev_admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_dev_data:/var/lib/grafana
+      - ./monitoring/grafana/dev-dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/dev-datasources:/etc/grafana/provisioning/datasources:ro
+    depends_on:
+      - prometheus-dev
+    networks:
+      - dev-network
+
+volumes:
+  web_ui_node_modules:
+  redis_dev_data:
+  postgres_dev_data:
+  prometheus_dev_data:
+  grafana_dev_data:
+
+networks:
+  dev-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16

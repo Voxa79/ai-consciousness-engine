@@ -1,0 +1,122 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: consciousness-engine-config
+  namespace: consciousness-engine
+data:
+  DATABASE_URL: postgresql://postgres:super_secure_password_123@postgres:5432/consciousness
+  REDIS_URL: redis://:super_secure_redis_123@redis:6379
+  OLLAMA_URL: http://ollama:11434
+  RUST_LOG: info
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: consciousness-engine
+  namespace: consciousness-engine
+  labels:
+    app: consciousness-engine
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: consciousness-engine
+  template:
+    metadata:
+      labels:
+        app: consciousness-engine
+    spec:
+      containers:
+      - name: consciousness-engine
+        image: ghcr.io/your-org/consciousness-engine/consciousness-engine:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: consciousness-engine-config
+              key: DATABASE_URL
+        - name: REDIS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: consciousness-engine-config
+              key: REDIS_URL
+        - name: OLLAMA_URL
+          valueFrom:
+            configMapKeyRef:
+              name: consciousness-engine-config
+              key: OLLAMA_URL
+        - name: RUST_LOG
+          valueFrom:
+            configMapKeyRef:
+              name: consciousness-engine-config
+              key: RUST_LOG
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: consciousness-engine
+  namespace: consciousness-engine
+  labels:
+    app: consciousness-engine
+spec:
+  selector:
+    app: consciousness-engine
+  ports:
+  - port: 8080
+    targetPort: 8080
+  type: ClusterIP
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: consciousness-engine-hpa
+  namespace: consciousness-engine
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: consciousness-engine
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80

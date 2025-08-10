@@ -1,0 +1,128 @@
+[workspace]
+members = [
+    "api-gateway",
+    "consciousness-service",
+    "consciousness-engine",
+    "shared",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Consciousness Engine Team <team@consciousness-engine.com>"]
+license = "MIT"
+repository = "https://github.com/consciousness-engine/api"
+homepage = "https://consciousness-engine.com"
+documentation = "https://docs.consciousness-engine.com"
+keywords = ["consciousness", "ai", "api", "microservices"]
+categories = ["web-programming", "api-bindings"]
+
+[workspace.dependencies]
+# Async runtime and HTTP
+tokio = { version = "1.35", features = ["full"] }
+axum = { version = "0.7", features = ["macros", "multipart", "ws"] }
+tower = { version = "0.4", features = ["full"] }
+tower-http = { version = "0.5", features = ["full"] }
+hyper = { version = "1.0", features = ["full"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+
+# Database
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json"] }
+redis = { version = "0.24", features = ["tokio-comp", "connection-manager"] }
+
+# Authentication & Security
+jsonwebtoken = "9.2"
+argon2 = "0.5"
+uuid = { version = "1.6", features = ["v4", "serde"] }
+
+# Observability
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+tracing-opentelemetry = "0.22"
+opentelemetry = { version = "0.21", features = ["rt-tokio"] }
+opentelemetry-jaeger = { version = "0.20", features = ["rt-tokio"] }
+metrics = "0.22"
+metrics-exporter-prometheus = "0.13"
+
+# Configuration
+config = "0.14"
+clap = { version = "4.4", features = ["derive", "env"] }
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Time and dates
+chrono = { version = "0.4", features = ["serde"] }
+
+# Validation
+validator = { version = "0.18", features = ["derive"] }
+
+# HTTP client
+reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+
+# Cryptography
+ring = "0.17"
+rustls = "0.22"
+
+# Concurrency
+dashmap = "5.5"
+parking_lot = "0.12"
+
+# Development and testing dependencies (shared via workspace)
+tokio-test = "0.4"
+wiremock = "0.5"
+tempfile = "3.8"
+criterion = { version = "0.5", features = ["html_reports"] }
+proptest = "1.4"
+
+# Profile configurations
+[profile.dev]
+opt-level = 0
+debug = true
+split-debuginfo = "unpacked"
+debug-assertions = true
+overflow-checks = true
+lto = false
+panic = "unwind"
+incremental = true
+codegen-units = 256
+rpath = false
+
+[profile.release]
+opt-level = 3
+debug = false
+split-debuginfo = "off"
+debug-assertions = false
+overflow-checks = false
+lto = "thin"
+panic = "abort"
+incremental = false
+codegen-units = 1
+rpath = false
+
+[profile.test]
+opt-level = 0
+debug = 2
+debug-assertions = true
+overflow-checks = true
+lto = false
+panic = "unwind"
+incremental = true
+codegen-units = 256
+
+# Benchmark profile
+[profile.bench]
+opt-level = 3
+debug = false
+debug-assertions = false
+overflow-checks = false
+lto = "thin"
+panic = "abort"
+incremental = false
+codegen-units = 1

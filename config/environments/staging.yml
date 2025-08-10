@@ -1,0 +1,347 @@
+# Staging Environment Configuration
+# Production-like environment for testing and validation
+
+environment: staging
+
+# Consciousness Engine Configuration
+consciousness_engine:
+  log_level: info
+  processing_timeout_ms: 150       # Slightly relaxed from production
+  quality_threshold: 0.90          # High but not production level
+  memory_limit_mb: 75              # Between dev and prod
+  enable_profiling: true           # Enabled for testing
+  enable_benchmarking: true        # Enabled for validation
+  
+  # Staging performance settings
+  max_concurrent_requests: 500
+  request_queue_size: 2000
+  worker_threads: 4
+  
+  # Testing optimizations
+  optimize_for_latency: true
+  enable_caching: true
+  cache_size_mb: 15
+
+# API Gateway Configuration
+api_gateway:
+  port: 8080
+  log_level: info
+  cors_enabled: true
+  cors_origins: ["https://staging.consciousness.ai", "http://localhost:3000"]
+  
+  # Moderate rate limiting
+  rate_limit:
+    requests_per_minute: 5000
+    burst_size: 500
+    per_ip_limit: 200
+  
+  # Staging authentication
+  jwt:
+    secret: "${STAGING_JWT_SECRET}"
+    expiry_hours: 2
+    refresh_enabled: true
+  
+  # Moderate timeouts
+  request_timeout_ms: 10000
+  consciousness_timeout_ms: 2000
+
+# Database Configuration
+database:
+  host: "${STAGING_DB_HOST}"
+  port: 5432
+  name: consciousness_staging
+  username: "${STAGING_DB_USERNAME}"
+  password: "${STAGING_DB_PASSWORD}"
+  
+  # Staging connection pool
+  max_connections: 25
+  min_connections: 5
+  connection_timeout_ms: 5000
+  
+  # Staging settings
+  log_queries: true               # Enabled for debugging
+  auto_migrate: true              # Enabled for testing
+  ssl_mode: prefer
+  
+  # Performance settings
+  prepared_statements: true
+  connection_pool_size: 15
+
+# Redis Configuration
+redis:
+  host: "${STAGING_REDIS_HOST}"
+  port: 6379
+  password: "${STAGING_REDIS_PASSWORD}"
+  database: 1                     # Different DB from production
+  
+  # Staging connection pool
+  max_connections: 25
+  connection_timeout_ms: 2000
+  
+  # Cache settings
+  default_ttl_seconds: 1800
+  max_memory_mb: 250
+  eviction_policy: "allkeys-lru"
+
+# Web UI Configuration
+web_ui:
+  api_url: "${STAGING_API_URL}"
+  websocket_url: "${STAGING_WS_URL}"
+  
+  # Staging settings
+  hot_reload: false
+  source_maps: true               # Enabled for debugging
+  debug_mode: true                # Enabled for testing
+  minification: true
+  compression: true
+  
+  # Feature flags
+  features:
+    consciousness_chat: true
+    performance_monitoring: true
+    debug_panel: true             # Enabled for testing
+    benchmark_ui: true            # Enabled for validation
+
+# Monitoring Configuration
+monitoring:
+  enabled: true
+  
+  # Prometheus
+  prometheus:
+    enabled: true
+    port: 9090
+    scrape_interval: 15s
+    retention: "7d"               # Shorter retention for staging
+  
+  # Grafana
+  grafana:
+    enabled: true
+    port: 3001
+    admin_password: "${STAGING_GRAFANA_PASSWORD}"
+  
+  # Jaeger
+  jaeger:
+    enabled: true
+    port: 16686
+    sampling_rate: 0.5            # Higher sampling for testing
+  
+  # Logging
+  logging:
+    level: info
+    format: json
+    output: both                  # Both file and stdout
+    file_path: "/app/logs/consciousness-staging.log"
+    max_size_mb: 50
+    max_files: 5
+
+# Security Configuration (Staging)
+security:
+  # TLS/SSL (staging certificates)
+  tls_enabled: true
+  certificate_path: "/etc/ssl/certs/staging.crt"
+  private_key_path: "/etc/ssl/private/staging.key"
+  
+  # CORS (moderate)
+  cors:
+    enabled: true
+    allow_origins: ["https://staging.consciousness.ai", "http://localhost:3000"]
+    allow_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    allow_headers: ["Authorization", "Content-Type", "X-Debug-Mode"]
+    allow_credentials: true
+  
+  # Rate limiting (moderate)
+  rate_limiting:
+    enabled: true
+    global_limit: 25000
+    per_ip_limit: 500
+    per_user_limit: 5000
+  
+  # Security headers (staging)
+  security_headers:
+    hsts_enabled: false           # Disabled for staging
+    csp_enabled: true
+    xss_protection: true
+    content_type_nosniff: true
+    frame_options: "SAMEORIGIN"
+  
+  # Authentication (relaxed)
+  authentication:
+    session_timeout_minutes: 60
+    max_login_attempts: 10
+    lockout_duration_minutes: 5
+
+# Performance Configuration
+performance:
+  # Resource limits (staging)
+  cpu_limit: "1.5"
+  cpu_request: "0.5"
+  
+  # Memory limits
+  memory_limit: "768Mi"
+  memory_request: "256Mi"
+  
+  # Scaling (limited for staging)
+  min_replicas: 2
+  max_replicas: 5
+  target_cpu_utilization: 75
+  target_memory_utilization: 85
+  
+  # Health checks
+  health_check:
+    initial_delay_seconds: 20
+    period_seconds: 15
+    timeout_seconds: 5
+    failure_threshold: 3
+
+# Feature Flags (Staging)
+features:
+  consciousness_processing: true
+  neuromorphic_acceleration: true   # Enabled for testing
+  quantum_processing: false        # Disabled (too resource intensive)
+  multimodal_fusion: true
+  ethical_reasoning: true
+  benchmarking: true               # Enabled for validation
+  profiling: true                  # Enabled for performance testing
+  debug_mode: true                 # Enabled for debugging
+
+# Testing Configuration
+testing:
+  enabled: true
+  
+  # Load testing
+  load_testing:
+    enabled: true
+    max_concurrent_users: 100
+    test_duration_minutes: 30
+    ramp_up_time_minutes: 5
+  
+  # Integration testing
+  integration_testing:
+    enabled: true
+    test_data_reset: true
+    mock_external_services: true
+  
+  # Performance testing
+  performance_testing:
+    enabled: true
+    benchmark_on_deploy: true
+    performance_regression_threshold: 0.1  # 10% regression threshold
+  
+  # Security testing
+  security_testing:
+    enabled: true
+    vulnerability_scanning: true
+    penetration_testing: false    # Manual only
+
+# Backup Configuration (Staging)
+backup:
+  enabled: true
+  
+  # Database backup (daily)
+  database_backup:
+    enabled: true
+    schedule: "0 4 * * *"          # Daily at 4 AM
+    retention_days: 7              # Shorter retention
+    encryption_enabled: true
+  
+  # File backup
+  file_backup:
+    enabled: false                 # Disabled for staging
+
+# Alerting Configuration (Staging)
+alerting:
+  enabled: true
+  
+  # Alert channels (staging)
+  channels:
+    slack:
+      enabled: true
+      webhook_url: "${STAGING_SLACK_WEBHOOK_URL}"
+      channel: "#consciousness-staging"
+    
+    email:
+      enabled: true
+      recipients: ["staging-ops@consciousness.ai"]
+  
+  # Alert rules (relaxed thresholds)
+  rules:
+    - name: "High Latency (Staging)"
+      condition: "avg_response_time > 200ms"
+      severity: "warning"
+      duration: "10m"
+    
+    - name: "High CPU Usage (Staging)"
+      condition: "cpu_usage > 85%"
+      severity: "warning"
+      duration: "15m"
+    
+    - name: "Low Consciousness Quality (Staging)"
+      condition: "consciousness_quality < 0.85"
+      severity: "warning"
+      duration: "10m"
+
+# Data Management
+data_management:
+  # Test data
+  test_data:
+    enabled: true
+    auto_generate: true
+    reset_on_deploy: true
+    anonymized_production_data: false
+  
+  # Data retention
+  retention:
+    logs_days: 30
+    metrics_days: 14
+    test_results_days: 90
+  
+  # Data privacy
+  privacy:
+    anonymization_enabled: true
+    pii_detection: true
+    data_masking: true
+
+# Deployment Configuration
+deployment:
+  # Blue-green deployment
+  blue_green:
+    enabled: true
+    health_check_duration: "5m"
+    rollback_threshold: 0.05      # 5% error rate triggers rollback
+  
+  # Canary deployment
+  canary:
+    enabled: false                # Disabled in staging
+  
+  # Database migrations
+  migrations:
+    auto_run: true
+    rollback_enabled: true
+    backup_before_migration: true
+  
+  # Post-deployment testing
+  post_deploy_tests:
+    enabled: true
+    smoke_tests: true
+    integration_tests: true
+    performance_tests: true
+
+# Environment-specific optimizations
+optimizations:
+  # Staging-specific optimizations
+  consciousness:
+    enable_detailed_logging: true
+    performance_profiling: true
+    memory_debugging: true
+  
+  # Database optimizations
+  database:
+    query_logging: true
+    slow_query_threshold_ms: 100
+    explain_analyze: true
+  
+  # Caching optimizations
+  caching:
+    debug_mode: true
+    cache_statistics: true
+    hit_ratio_monitoring: true

@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: consciousness-system
+  labels:
+    name: consciousness-system
+    app.kubernetes.io/name: consciousness-engine
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/component: namespace
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: consciousness-quota
+  namespace: consciousness-system
+spec:
+  hard:
+    requests.cpu: "10"
+    requests.memory: 20Gi
+    limits.cpu: "20"
+    limits.memory: 40Gi
+    persistentvolumeclaims: "10"
+    services: "10"
+    secrets: "10"
+    configmaps: "10"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: consciousness-limits
+  namespace: consciousness-system
+spec:
+  limits:
+  - default:
+      cpu: "1"
+      memory: "2Gi"
+    defaultRequest:
+      cpu: "100m"
+      memory: "256Mi"
+    type: Container

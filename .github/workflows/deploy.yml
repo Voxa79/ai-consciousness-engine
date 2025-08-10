@@ -1,0 +1,155 @@
+name: 🚀 Deploy Consciousness Engine to Netlify
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '20'
+  NPM_VERSION: '10'
+
+jobs:
+  # Security and Quality Checks
+  security-scan:
+    name: 🔒 Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🔍 Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: 📤 Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # Build and Test
+  build-and-test:
+    name: 🏗️ Build & Test
+    runs-on: ubuntu-latest
+    needs: security-scan
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📋 Install dependencies
+        run: |
+          npm ci --production=false
+          npm audit --audit-level=high
+
+      - name: 🧪 Run tests
+        run: |
+          npm run type-check
+          npm run lint
+
+      - name: 🏗️ Build application
+        run: |
+          npm run build:netlify
+        env:
+          NODE_ENV: production
+          VITE_APP_VERSION: ${{ github.sha }}
+          VITE_BUILD_TIME: ${{ github.event.head_commit.timestamp }}
+          VITE_CONSCIOUSNESS_MODE: production
+          VITE_NEURAL_INTERFACE_ENABLED: true
+          VITE_QUANTUM_COMPUTING_ENABLED: true
+          VITE_NANOTECHNOLOGY_ENABLED: true
+          VITE_SPACE_NETWORK_ENABLED: true
+
+      - name: 📊 Check build size
+        run: |
+          du -sh dist/
+          ls -la dist/
+
+      - name: 📤 Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: consciousness-engine-build
+          path: dist/
+          retention-days: 7
+
+  # Deploy to Netlify
+  deploy-netlify:
+    name: 🌐 Deploy to Netlify
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: production
+      url: https://consciousness-engine.netlify.app
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📋 Install dependencies
+        run: npm ci --production=false
+
+      - name: 🏗️ Build application
+        run: npm run build:netlify
+        env:
+          NODE_ENV: production
+          VITE_APP_VERSION: ${{ github.sha }}
+          VITE_BUILD_TIME: ${{ github.event.head_commit.timestamp }}
+          VITE_CONSCIOUSNESS_MODE: production
+
+      - name: 🚀 Deploy to Netlify
+        uses: netlify/actions/cli@master
+        with:
+          args: deploy --prod --dir=dist --message="🚀 Deploy ${{ github.sha }}"
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+
+      - name: 🧪 Run post-deployment tests
+        run: |
+          sleep 30  # Wait for deployment to be live
+          curl -f https://consciousness-engine.netlify.app/api/consciousness/health || exit 1
+          curl -f https://consciousness-engine.netlify.app/api/neural/health || exit 1
+          curl -f https://consciousness-engine.netlify.app/api/quantum/health || exit 1
+
+  # Notify deployment status
+  notify:
+    name: 📢 Notify Deployment
+    runs-on: ubuntu-latest
+    needs: [deploy-netlify]
+    if: always()
+    steps:
+      - name: 📢 Deployment Success
+        if: needs.deploy-netlify.result == 'success'
+        run: |
+          echo "🎉 Consciousness Engine deployed successfully!"
+          echo "🌐 Live at: https://consciousness-engine.netlify.app"
+          echo "🧠 Neural Interface: https://consciousness-engine.netlify.app/api/neural/"
+          echo "⚛️ Quantum Service: https://consciousness-engine.netlify.app/api/quantum/"
+          echo "🔬 Nano Service: https://consciousness-engine.netlify.app/api/nano/"
+          echo "🚀 Space Service: https://consciousness-engine.netlify.app/api/space/"
+
+      - name: ❌ Deployment Failed
+        if: needs.deploy-netlify.result == 'failure'
+        run: |
+          echo "❌ Consciousness Engine deployment failed!"
+          exit 1

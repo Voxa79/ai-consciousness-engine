@@ -1,0 +1,435 @@
+# Cilium CNI Configuration for Consciousness Platform
+# Zero-trust networking with advanced security features
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cilium-config
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: cilium
+    app.kubernetes.io/component: config
+data:
+  # Enable Hubble for network observability
+  enable-hubble: "true"
+  hubble-listen-address: ":4244"
+  hubble-metrics-server: ":9091"
+  hubble-metrics: >-
+    dns,drop,tcp,flow,icmp,http
+  
+  # Enable network policies
+  enable-policy: "always"
+  policy-enforcement-mode: "default"
+  
+  # Enable identity-based security
+  enable-identity-mark: "true"
+  
+  # Enable encryption for all traffic
+  enable-wireguard: "true"
+  enable-ipsec: "false"
+  
+  # Enable L7 proxy for HTTP/gRPC
+  enable-l7-proxy: "true"
+  
+  # Enable bandwidth management
+  enable-bandwidth-manager: "true"
+  
+  # Enable service mesh features
+  enable-envoy-config: "true"
+  
+  # Consciousness Platform specific settings
+  cluster-name: "consciousness-platform"
+  cluster-id: "1"
+  
+  # IPAM configuration
+  ipam: "kubernetes"
+  enable-ipv4: "true"
+  enable-ipv6: "false"
+  
+  # Datapath mode
+  datapath-mode: "veth"
+  tunnel: "vxlan"
+  
+  # Security settings
+  enable-endpoint-health-checking: "true"
+  enable-health-checking: "true"
+  
+  # Monitoring and observability
+  enable-prometheus-metrics: "true"
+  prometheus-serve-addr: ":9090"
+  
+  # Debug settings (disable in production)
+  debug: "false"
+  debug-verbose: ""
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: consciousness-network-policies
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: cilium
+    app.kubernetes.io/component: policies
+data:
+  consciousness-engine-policy.yaml: |
+    apiVersion: "cilium.io/v2"
+    kind: CiliumNetworkPolicy
+    metadata:
+      name: consciousness-engine-policy
+      namespace: default
+    spec:
+      endpointSelector:
+        matchLabels:
+          app: consciousness-engine
+      ingress:
+      - fromEndpoints:
+        - matchLabels:
+            app: api-gateway
+        toPorts:
+        - ports:
+          - port: "8081"
+            protocol: TCP
+          rules:
+            http:
+            - method: "POST"
+              path: "/process"
+            - method: "GET"
+              path: "/health"
+            - method: "GET"
+              path: "/metrics"
+      - fromEndpoints:
+        - matchLabels:
+            app: prometheus
+        toPorts:
+        - ports:
+          - port: "8081"
+            protocol: TCP
+          rules:
+            http:
+            - method: "GET"
+              path: "/metrics"
+      egress:
+      - toEndpoints:
+        - matchLabels:
+            app: postgres
+        toPorts:
+        - ports:
+          - port: "5432"
+            protocol: TCP
+      - toEndpoints:
+        - matchLabels:
+            app: redis
+        toPorts:
+        - ports:
+          - port: "6379"
+            protocol: TCP
+      - toEndpoints:
+        - matchLabels:
+            app: vault
+        toPorts:
+        - ports:
+          - port: "8200"
+            protocol: TCP
+          rules:
+            http:
+            - method: "GET"
+              path: "/v1/sys/health"
+            - method: "POST"
+              path: "/v1/auth/kubernetes/login"
+            - method: "GET"
+              path: "/v1/consciousness/data/*"
+
+  api-gateway-policy.yaml: |
+    apiVersion: "cilium.io/v2"
+    kind: CiliumNetworkPolicy
+    metadata:
+      name: api-gateway-policy
+      namespace: default
+    spec:
+      endpointSelector:
+        matchLabels:
+          app: api-gateway
+      ingress:
+      - fromEndpoints:
+        - matchLabels:
+            app: nginx
+        toPorts:
+        - ports:
+          - port: "8080"
+            protocol: TCP
+          rules:
+            http:
+            - method: "GET"
+              path: "/health"
+            - method: "POST"
+              path: "/api/consciousness/*"
+            - method: "GET"
+              path: "/api/consciousness/*"
+      - fromEndpoints:
+        - matchLabels:
+            app: web-ui
+        toPorts:
+        - ports:
+          - port: "8080"
+            protocol: TCP
+      - fromCIDR:
+        - "0.0.0.0/0"  # Allow external traffic (will be restricted by ingress)
+        toPorts:
+        - ports:
+          - port: "8080"
+            protocol: TCP
+          rules:
+            http:
+            - method: "GET"
+              path: "/health"
+            - method: "POST"
+              path: "/api/auth/*"
+      egress:
+      - toEndpoints:
+        - matchLabels:
+            app: consciousness-engine
+        toPorts:
+        - ports:
+          - port: "8081"
+            protocol: TCP
+      - toEndpoints:
+        - matchLabels:
+            app: postgres
+        toPorts:
+        - ports:
+          - port: "5432"
+            protocol: TCP
+      - toEndpoints:
+        - matchLabels:
+            app: redis
+        toPorts:
+        - ports:
+          - port: "6379"
+            protocol: TCP
+      - toEndpoints:
+        - matchLabels:
+            app: vault
+        toPorts:
+        - ports:
+          - port: "8200"
+            protocol: TCP
+
+  database-policy.yaml: |
+    apiVersion: "cilium.io/v2"
+    kind: CiliumNetworkPolicy
+    metadata:
+      name: database-policy
+      namespace: default
+    spec:
+      endpointSelector:
+        matchLabels:
+          app: postgres
+      ingress:
+      - fromEndpoints:
+        - matchLabels:
+            app: consciousness-engine
+        toPorts:
+        - ports:
+          - port: "5432"
+            protocol: TCP
+      - fromEndpoints:
+        - matchLabels:
+            app: api-gateway
+        toPorts:
+        - ports:
+          - port: "5432"
+            protocol: TCP
+      - fromEndpoints:
+        - matchLabels:
+            app: vault
+        toPorts:
+        - ports:
+          - port: "5432"
+            protocol: TCP
+      egress: []  # No outbound connections allowed
+
+  redis-policy.yaml: |
+    apiVersion: "cilium.io/v2"
+    kind: CiliumNetworkPolicy
+    metadata:
+      name: redis-policy
+      namespace: default
+    spec:
+      endpointSelector:
+        matchLabels:
+          app: redis
+      ingress:
+      - fromEndpoints:
+        - matchLabels:
+            app: consciousness-engine
+        toPorts:
+        - ports:
+          - port: "6379"
+            protocol: TCP
+      - fromEndpoints:
+        - matchLabels:
+            app: api-gateway
+        toPorts:
+        - ports:
+          - port: "6379"
+            protocol: TCP
+      egress: []  # No outbound connections allowed
+
+  vault-policy.yaml: |
+    apiVersion: "cilium.io/v2"
+    kind: CiliumNetworkPolicy
+    metadata:
+      name: vault-policy
+      namespace: vault
+    spec:
+      endpointSelector:
+        matchLabels:
+          app: vault
+      ingress:
+      - fromEndpoints:
+        - matchLabels:
+            app: consciousness-engine
+        toPorts:
+        - ports:
+          - port: "8200"
+            protocol: TCP
+          rules:
+            http:
+            - method: "GET"
+              path: "/v1/sys/health"
+            - method: "POST"
+              path: "/v1/auth/kubernetes/login"
+            - method: "GET"
+              path: "/v1/consciousness/data/*"
+            - method: "POST"
+              path: "/v1/consciousness/data/*"
+      - fromEndpoints:
+        - matchLabels:
+            app: api-gateway
+        toPorts:
+        - ports:
+          - port: "8200"
+            protocol: TCP
+      - fromEndpoints:
+        - matchLabels:
+            app: prometheus
+        toPorts:
+        - ports:
+          - port: "8200"
+            protocol: TCP
+          rules:
+            http:
+            - method: "GET"
+              path: "/v1/sys/metrics"
+      egress:
+      - toEndpoints:
+        - matchLabels:
+            app: postgres
+        toPorts:
+        - ports:
+          - port: "5432"
+            protocol: TCP
+      - toFQDNs:
+        - matchName: "kms.us-west-2.amazonaws.com"  # For auto-unsealing
+        toPorts:
+        - ports:
+          - port: "443"
+            protocol: TCP
+
+  deny-all-default.yaml: |
+    apiVersion: "cilium.io/v2"
+    kind: CiliumNetworkPolicy
+    metadata:
+      name: deny-all-default
+      namespace: default
+    spec:
+      endpointSelector: {}
+      ingress: []
+      egress:
+      - toEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": kube-system
+            "k8s:k8s-app": kube-dns
+        toPorts:
+        - ports:
+          - port: "53"
+            protocol: UDP
+          - port: "53"
+            protocol: TCP
+      - toFQDNs:
+        - matchName: "kubernetes.default.svc.cluster.local"
+        toPorts:
+        - ports:
+          - port: "443"
+            protocol: TCP
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: consciousness-l7-policies
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: cilium
+    app.kubernetes.io/component: l7-policies
+data:
+  consciousness-http-policy.yaml: |
+    apiVersion: "cilium.io/v2"
+    kind: CiliumNetworkPolicy
+    metadata:
+      name: consciousness-http-policy
+      namespace: default
+    spec:
+      endpointSelector:
+        matchLabels:
+          app: consciousness-engine
+      ingress:
+      - fromEndpoints:
+        - matchLabels:
+            app: api-gateway
+        toPorts:
+        - ports:
+          - port: "8081"
+            protocol: TCP
+          rules:
+            http:
+            - method: "POST"
+              path: "/process"
+              headers:
+              - "Content-Type: application/json"
+            - method: "GET"
+              path: "/health"
+            - method: "GET"
+              path: "/metrics"
+              headers:
+              - "Accept: text/plain"
+
+  api-gateway-rate-limit.yaml: |
+    apiVersion: "cilium.io/v2"
+    kind: CiliumNetworkPolicy
+    metadata:
+      name: api-gateway-rate-limit
+      namespace: default
+    spec:
+      endpointSelector:
+        matchLabels:
+          app: api-gateway
+      ingress:
+      - fromCIDR:
+        - "0.0.0.0/0"
+        toPorts:
+        - ports:
+          - port: "8080"
+            protocol: TCP
+          rules:
+            http:
+            - method: "POST"
+              path: "/api/consciousness/process"
+              headers:
+              - "Content-Type: application/json"
+              # Rate limiting: 100 requests per minute per IP
+              rateLimit:
+                requests: 100
+                period: "1m"
+                burst: 20

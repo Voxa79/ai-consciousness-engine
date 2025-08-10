@@ -1,0 +1,368 @@
+# HashiCorp Vault Configuration for Consciousness Platform
+# Production-ready Vault deployment with HA and auto-unsealing
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vault-config
+  namespace: vault
+  labels:
+    app: vault
+    component: config
+data:
+  vault.hcl: |
+    # Vault Configuration for Consciousness Platform
+    
+    # Storage backend - Consul for HA
+    storage "consul" {
+      address = "consul:8500"
+      path    = "vault/"
+      
+      # Consul configuration
+      scheme = "http"
+      service = "vault"
+      service_tags = "consciousness,vault"
+      
+      # Session TTL
+      session_ttl = "15s"
+      lock_wait_time = "15s"
+    }
+    
+    # Alternative: Integrated Storage (Raft) for simpler setup
+    # storage "raft" {
+    #   path = "/vault/data"
+    #   node_id = "vault-0"
+    #   
+    #   retry_join {
+    #     leader_api_addr = "http://vault-1:8200"
+    #   }
+    #   retry_join {
+    #     leader_api_addr = "http://vault-2:8200"
+    #   }
+    # }
+    
+    # Listener configuration
+    listener "tcp" {
+      address         = "0.0.0.0:8200"
+      cluster_address = "0.0.0.0:8201"
+      tls_disable     = false
+      
+      # TLS Configuration
+      tls_cert_file = "/vault/tls/vault.crt"
+      tls_key_file  = "/vault/tls/vault.key"
+      tls_min_version = "tls12"
+      
+      # Client certificate authentication
+      tls_require_and_verify_client_cert = false
+      tls_client_ca_file = "/vault/tls/ca.crt"
+    }
+    
+    # API address
+    api_addr = "https://vault:8200"
+    cluster_addr = "https://vault:8201"
+    
+    # UI configuration
+    ui = true
+    
+    # Logging
+    log_level = "INFO"
+    log_format = "json"
+    
+    # Disable mlock for containers
+    disable_mlock = true
+    
+    # Auto-unsealing with cloud KMS (AWS example)
+    seal "awskms" {
+      region     = "us-west-2"
+      kms_key_id = "alias/vault-unseal-key"
+      endpoint   = "https://kms.us-west-2.amazonaws.com"
+    }
+    
+    # Alternative: Auto-unsealing with Azure Key Vault
+    # seal "azurekeyvault" {
+    #   tenant_id      = "your-tenant-id"
+    #   client_id      = "your-client-id"
+    #   client_secret  = "your-client-secret"
+    #   vault_name     = "your-key-vault"
+    #   key_name       = "vault-unseal-key"
+    # }
+    
+    # Telemetry
+    telemetry {
+      prometheus_retention_time = "30s"
+      disable_hostname = true
+      
+      # StatsD configuration
+      statsd_address = "statsd:8125"
+    }
+    
+    # Plugin directory
+    plugin_directory = "/vault/plugins"
+    
+    # Default lease TTL
+    default_lease_ttl = "768h"
+    max_lease_ttl = "8760h"
+    
+    # Cluster configuration
+    cluster_name = "consciousness-vault"
+    
+    # Raw storage endpoint (for debugging)
+    raw_storage_endpoint = true
+    
+    # Entropy Augmentation (for additional randomness)
+    entropy "seal" {
+      mode = "augmentation"
+    }
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vault-policies
+  namespace: vault
+  labels:
+    app: vault
+    component: policies
+data:
+  consciousness-engine-policy.hcl: |
+    # Policy for Consciousness Engine
+    path "secret/data/consciousness-engine/*" {
+      capabilities = ["read"]
+    }
+    
+    path "secret/data/shared/*" {
+      capabilities = ["read"]
+    }
+    
+    path "database/creds/consciousness-engine" {
+      capabilities = ["read"]
+    }
+    
+    path "auth/token/lookup-self" {
+      capabilities = ["read"]
+    }
+    
+    path "auth/token/renew-self" {
+      capabilities = ["update"]
+    }
+    
+    path "sys/capabilities-self" {
+      capabilities = ["update"]
+    }
+
+  api-gateway-policy.hcl: |
+    # Policy for API Gateway
+    path "secret/data/api-gateway/*" {
+      capabilities = ["read"]
+    }
+    
+    path "secret/data/shared/*" {
+      capabilities = ["read"]
+    }
+    
+    path "database/creds/api-gateway" {
+      capabilities = ["read"]
+    }
+    
+    path "pki/issue/consciousness-platform" {
+      capabilities = ["update"]
+    }
+    
+    path "auth/token/lookup-self" {
+      capabilities = ["read"]
+    }
+    
+    path "auth/token/renew-self" {
+      capabilities = ["update"]
+    }
+
+  admin-policy.hcl: |
+    # Admin policy for Vault management
+    path "*" {
+      capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+    }
+
+  monitoring-policy.hcl: |
+    # Policy for monitoring systems
+    path "sys/metrics" {
+      capabilities = ["read"]
+    }
+    
+    path "sys/health" {
+      capabilities = ["read"]
+    }
+    
+    path "sys/seal-status" {
+      capabilities = ["read"]
+    }
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vault-init-scripts
+  namespace: vault
+  labels:
+    app: vault
+    component: init
+data:
+  init-vault.sh: |
+    #!/bin/bash
+    set -e
+    
+    echo "Initializing Vault for Consciousness Platform..."
+    
+    # Wait for Vault to be ready
+    until vault status; do
+      echo "Waiting for Vault to be ready..."
+      sleep 5
+    done
+    
+    # Check if Vault is already initialized
+    if vault status | grep -q "Initialized.*true"; then
+      echo "Vault is already initialized"
+      exit 0
+    fi
+    
+    # Initialize Vault
+    echo "Initializing Vault..."
+    vault operator init \
+      -key-shares=5 \
+      -key-threshold=3 \
+      -format=json > /vault/init/vault-init.json
+    
+    # Extract unseal keys and root token
+    UNSEAL_KEY_1=$(cat /vault/init/vault-init.json | jq -r '.unseal_keys_b64[0]')
+    UNSEAL_KEY_2=$(cat /vault/init/vault-init.json | jq -r '.unseal_keys_b64[1]')
+    UNSEAL_KEY_3=$(cat /vault/init/vault-init.json | jq -r '.unseal_keys_b64[2]')
+    ROOT_TOKEN=$(cat /vault/init/vault-init.json | jq -r '.root_token')
+    
+    # Unseal Vault
+    echo "Unsealing Vault..."
+    vault operator unseal $UNSEAL_KEY_1
+    vault operator unseal $UNSEAL_KEY_2
+    vault operator unseal $UNSEAL_KEY_3
+    
+    # Login with root token
+    vault auth $ROOT_TOKEN
+    
+    echo "Vault initialization completed successfully!"
+
+  setup-consciousness-secrets.sh: |
+    #!/bin/bash
+    set -e
+    
+    echo "Setting up Consciousness Platform secrets..."
+    
+    # Enable KV secrets engine
+    vault secrets enable -path=secret kv-v2
+    
+    # Enable database secrets engine
+    vault secrets enable database
+    
+    # Enable PKI secrets engine for certificates
+    vault secrets enable pki
+    vault secrets tune -max-lease-ttl=87600h pki
+    
+    # Configure PKI
+    vault write pki/root/generate/internal \
+      common_name="Consciousness Platform CA" \
+      ttl=87600h
+    
+    vault write pki/config/urls \
+      issuing_certificates="https://vault:8200/v1/pki/ca" \
+      crl_distribution_points="https://vault:8200/v1/pki/crl"
+    
+    vault write pki/roles/consciousness-platform \
+      allowed_domains="consciousness.local,consciousness.ai" \
+      allow_subdomains=true \
+      max_ttl=72h
+    
+    # Configure database connection
+    vault write database/config/consciousness-db \
+      plugin_name=postgresql-database-plugin \
+      connection_url="postgresql://{{username}}:{{password}}@postgres:5432/consciousness?sslmode=disable" \
+      allowed_roles="consciousness-engine,api-gateway" \
+      username="vault" \
+      password="vault-db-password"
+    
+    # Create database roles
+    vault write database/roles/consciousness-engine \
+      db_name=consciousness-db \
+      creation_statements="CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}'; GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO \"{{name}}\";" \
+      default_ttl="1h" \
+      max_ttl="24h"
+    
+    vault write database/roles/api-gateway \
+      db_name=consciousness-db \
+      creation_statements="CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}'; GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA public TO \"{{name}}\";" \
+      default_ttl="1h" \
+      max_ttl="24h"
+    
+    # Store application secrets
+    vault kv put secret/consciousness-engine \
+      database_encryption_key="$(openssl rand -base64 32)" \
+      jwt_signing_key="$(openssl rand -base64 64)" \
+      api_key="$(openssl rand -hex 32)"
+    
+    vault kv put secret/api-gateway \
+      session_secret="$(openssl rand -base64 32)" \
+      csrf_token="$(openssl rand -hex 16)" \
+      oauth_client_secret="oauth-secret-placeholder"
+    
+    vault kv put secret/shared \
+      redis_password="$(openssl rand -base64 16)" \
+      monitoring_token="$(openssl rand -hex 24)" \
+      webhook_secret="$(openssl rand -base64 24)"
+    
+    # Enable Kubernetes auth
+    vault auth enable kubernetes
+    
+    vault write auth/kubernetes/config \
+      token_reviewer_jwt="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
+      kubernetes_host="https://$KUBERNETES_PORT_443_TCP_ADDR:443" \
+      kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    
+    # Create policies (from ConfigMap)
+    vault policy write consciousness-engine /vault/policies/consciousness-engine-policy.hcl
+    vault policy write api-gateway /vault/policies/api-gateway-policy.hcl
+    vault policy write admin /vault/policies/admin-policy.hcl
+    vault policy write monitoring /vault/policies/monitoring-policy.hcl
+    
+    # Create Kubernetes auth roles
+    vault write auth/kubernetes/role/consciousness-engine \
+      bound_service_account_names=consciousness-engine \
+      bound_service_account_namespaces=default,staging,production \
+      policies=consciousness-engine \
+      ttl=1h
+    
+    vault write auth/kubernetes/role/api-gateway \
+      bound_service_account_names=api-gateway \
+      bound_service_account_namespaces=default,staging,production \
+      policies=api-gateway \
+      ttl=1h
+    
+    echo "Consciousness Platform secrets setup completed!"
+
+  backup-vault.sh: |
+    #!/bin/bash
+    set -e
+    
+    echo "Creating Vault backup..."
+    
+    BACKUP_DIR="/vault/backups"
+    TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+    BACKUP_FILE="$BACKUP_DIR/vault-backup-$TIMESTAMP.snap"
+    
+    mkdir -p $BACKUP_DIR
+    
+    # Create snapshot
+    vault operator raft snapshot save $BACKUP_FILE
+    
+    # Compress backup
+    gzip $BACKUP_FILE
+    
+    # Clean old backups (keep last 7 days)
+    find $BACKUP_DIR -name "vault-backup-*.snap.gz" -mtime +7 -delete
+    
+    echo "Vault backup completed: $BACKUP_FILE.gz"

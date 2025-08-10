@@ -1,0 +1,366 @@
+# Production Environment Configuration
+# Optimized for high performance, security, and reliability
+
+environment: production
+
+# Consciousness Engine Configuration
+consciousness_engine:
+  log_level: info
+  processing_timeout_ms: 100       # Strict production target
+  quality_threshold: 0.95          # High quality requirement
+  memory_limit_mb: 50              # Optimized memory usage
+  enable_profiling: false          # Disabled for performance
+  enable_benchmarking: false       # Disabled in production
+  
+  # Production performance settings
+  max_concurrent_requests: 1000
+  request_queue_size: 5000
+  worker_threads: 8
+  
+  # Optimization flags
+  optimize_for_latency: true
+  enable_caching: true
+  cache_size_mb: 20
+
+# API Gateway Configuration
+api_gateway:
+  port: 8080
+  log_level: warn
+  cors_enabled: true
+  cors_origins: ["https://consciousness.ai", "https://app.consciousness.ai"]
+  
+  # Strict rate limiting
+  rate_limit:
+    requests_per_minute: 10000
+    burst_size: 1000
+    per_ip_limit: 100
+  
+  # Production authentication
+  jwt:
+    secret: "${JWT_SECRET}"          # From environment variable
+    expiry_hours: 1                  # Short expiry for security
+    refresh_enabled: true
+  
+  # Strict timeouts
+  request_timeout_ms: 5000
+  consciousness_timeout_ms: 1000
+
+# Database Configuration
+database:
+  host: "${DB_HOST}"
+  port: 5432
+  name: consciousness_prod
+  username: "${DB_USERNAME}"
+  password: "${DB_PASSWORD}"
+  
+  # Production connection pool
+  max_connections: 50
+  min_connections: 10
+  connection_timeout_ms: 3000
+  idle_timeout_ms: 600000
+  
+  # Production settings
+  log_queries: false
+  auto_migrate: false              # Manual migrations in production
+  ssl_mode: require
+  
+  # Performance optimization
+  prepared_statements: true
+  connection_pool_size: 20
+
+# Redis Configuration
+redis:
+  host: "${REDIS_HOST}"
+  port: 6379
+  password: "${REDIS_PASSWORD}"
+  database: 0
+  
+  # Production connection pool
+  max_connections: 50
+  connection_timeout_ms: 1000
+  
+  # Cache settings
+  default_ttl_seconds: 1800        # 30 minutes
+  max_memory_mb: 500
+  eviction_policy: "allkeys-lru"
+  
+  # Clustering (if enabled)
+  cluster_enabled: false
+  sentinel_enabled: false
+
+# Web UI Configuration
+web_ui:
+  api_url: "${API_URL}"
+  websocket_url: "${WS_URL}"
+  
+  # Production settings
+  hot_reload: false
+  source_maps: false
+  debug_mode: false
+  minification: true
+  compression: true
+  
+  # CDN configuration
+  cdn_url: "${CDN_URL}"
+  static_assets_url: "${STATIC_ASSETS_URL}"
+  
+  # Feature flags
+  features:
+    consciousness_chat: true
+    performance_monitoring: false   # Admin only
+    debug_panel: false             # Disabled in production
+    benchmark_ui: false            # Disabled in production
+
+# Monitoring Configuration
+monitoring:
+  enabled: true
+  
+  # Prometheus
+  prometheus:
+    enabled: true
+    port: 9090
+    scrape_interval: 30s
+    retention: "30d"
+    
+    # External monitoring
+    remote_write:
+      enabled: true
+      url: "${PROMETHEUS_REMOTE_WRITE_URL}"
+  
+  # Grafana
+  grafana:
+    enabled: true
+    port: 3000
+    admin_password: "${GRAFANA_ADMIN_PASSWORD}"
+    
+    # External authentication
+    oauth_enabled: true
+    oauth_provider: "${OAUTH_PROVIDER}"
+  
+  # Jaeger
+  jaeger:
+    enabled: true
+    port: 16686
+    sampling_rate: 0.1              # 10% sampling for performance
+  
+  # Logging
+  logging:
+    level: info
+    format: json
+    output: file
+    file_path: "/app/logs/consciousness.log"
+    max_size_mb: 100
+    max_files: 10
+    
+    # External log aggregation
+    external_logging:
+      enabled: true
+      endpoint: "${LOG_AGGREGATION_ENDPOINT}"
+
+# Security Configuration (Production)
+security:
+  # TLS/SSL
+  tls_enabled: true
+  certificate_path: "/etc/ssl/certs/consciousness.crt"
+  private_key_path: "/etc/ssl/private/consciousness.key"
+  
+  # CORS (restrictive)
+  cors:
+    enabled: true
+    allow_origins: ["https://consciousness.ai"]
+    allow_methods: ["GET", "POST", "PUT", "DELETE"]
+    allow_headers: ["Authorization", "Content-Type"]
+    allow_credentials: true
+  
+  # Rate limiting (strict)
+  rate_limiting:
+    enabled: true
+    global_limit: 50000
+    per_ip_limit: 1000
+    per_user_limit: 10000
+  
+  # Security headers
+  security_headers:
+    hsts_enabled: true
+    csp_enabled: true
+    xss_protection: true
+    content_type_nosniff: true
+    frame_options: "DENY"
+  
+  # Authentication
+  authentication:
+    session_timeout_minutes: 30
+    max_login_attempts: 5
+    lockout_duration_minutes: 15
+    
+  # Encryption
+  encryption:
+    algorithm: "AES-256-GCM"
+    key_rotation_days: 90
+
+# Performance Configuration
+performance:
+  # Resource limits (production)
+  cpu_limit: "2.0"
+  cpu_request: "1.0"
+  
+  # Memory limits
+  memory_limit: "1Gi"
+  memory_request: "512Mi"
+  
+  # Auto-scaling
+  min_replicas: 3
+  max_replicas: 20
+  target_cpu_utilization: 70
+  target_memory_utilization: 80
+  
+  # Health checks
+  health_check:
+    initial_delay_seconds: 30
+    period_seconds: 10
+    timeout_seconds: 3
+    failure_threshold: 3
+    success_threshold: 1
+  
+  # Readiness probe
+  readiness_probe:
+    initial_delay_seconds: 10
+    period_seconds: 5
+    timeout_seconds: 2
+    failure_threshold: 3
+
+# Feature Flags (Production)
+features:
+  consciousness_processing: true
+  neuromorphic_acceleration: true
+  quantum_processing: true
+  multimodal_fusion: true
+  ethical_reasoning: true
+  benchmarking: false              # Disabled in production
+  profiling: false                 # Disabled in production
+  debug_mode: false                # Disabled in production
+
+# Backup and Disaster Recovery
+backup:
+  enabled: true
+  
+  # Database backup
+  database_backup:
+    enabled: true
+    schedule: "0 2 * * *"           # Daily at 2 AM
+    retention_days: 30
+    encryption_enabled: true
+    
+  # File backup
+  file_backup:
+    enabled: true
+    paths: ["/app/data", "/app/logs"]
+    schedule: "0 3 * * *"           # Daily at 3 AM
+    retention_days: 7
+  
+  # Cross-region replication
+  replication:
+    enabled: true
+    target_regions: ["us-west-2", "eu-west-1"]
+
+# Alerting Configuration
+alerting:
+  enabled: true
+  
+  # Alert channels
+  channels:
+    slack:
+      enabled: true
+      webhook_url: "${SLACK_WEBHOOK_URL}"
+      channel: "#consciousness-alerts"
+    
+    email:
+      enabled: true
+      smtp_server: "${SMTP_SERVER}"
+      recipients: ["ops@consciousness.ai"]
+    
+    pagerduty:
+      enabled: true
+      integration_key: "${PAGERDUTY_INTEGRATION_KEY}"
+  
+  # Alert rules
+  rules:
+    # Performance alerts
+    - name: "High Latency"
+      condition: "avg_response_time > 100ms"
+      severity: "warning"
+      duration: "5m"
+    
+    - name: "Critical Latency"
+      condition: "avg_response_time > 500ms"
+      severity: "critical"
+      duration: "2m"
+    
+    # Resource alerts
+    - name: "High CPU Usage"
+      condition: "cpu_usage > 80%"
+      severity: "warning"
+      duration: "10m"
+    
+    - name: "High Memory Usage"
+      condition: "memory_usage > 85%"
+      severity: "warning"
+      duration: "5m"
+    
+    # Consciousness quality alerts
+    - name: "Low Consciousness Quality"
+      condition: "consciousness_quality < 0.90"
+      severity: "warning"
+      duration: "5m"
+    
+    # Error rate alerts
+    - name: "High Error Rate"
+      condition: "error_rate > 1%"
+      severity: "critical"
+      duration: "2m"
+
+# Compliance and Auditing
+compliance:
+  enabled: true
+  
+  # Audit logging
+  audit_logging:
+    enabled: true
+    log_all_requests: true
+    log_data_access: true
+    retention_days: 365
+  
+  # GDPR compliance
+  gdpr:
+    enabled: true
+    data_retention_days: 730
+    anonymization_enabled: true
+    right_to_deletion: true
+  
+  # SOC2 compliance
+  soc2:
+    enabled: true
+    access_logging: true
+    change_management: true
+    incident_response: true
+
+# Optimization Settings
+optimization:
+  # Consciousness engine optimizations
+  consciousness:
+    enable_caching: true
+    cache_hit_ratio_target: 0.95
+    memory_optimization: true
+    cpu_optimization: true
+  
+  # Database optimizations
+  database:
+    query_optimization: true
+    index_optimization: true
+    connection_pooling: true
+  
+  # Network optimizations
+  network:
+    compression_enabled: true
+    keep_alive_enabled: true
+    tcp_no_delay: true

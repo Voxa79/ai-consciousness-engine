@@ -1,0 +1,439 @@
+# Falco Deployment for Consciousness Platform
+# Runtime security monitoring and intrusion detection
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: falco-system
+  labels:
+    name: falco-system
+    app.kubernetes.io/name: falco
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: falco
+  namespace: falco-system
+  labels:
+    app.kubernetes.io/name: falco
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: falco
+  labels:
+    app.kubernetes.io/name: falco
+rules:
+- apiGroups: [""]
+  resources: ["nodes", "namespaces", "pods", "replicationcontrollers", "services", "events"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["daemonsets", "deployments", "replicasets", "statefulsets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["extensions"]
+  resources: ["daemonsets", "deployments", "replicasets"]
+  verbs: ["get", "list", "watch"]
+- nonResourceURLs: ["/healthz", "/healthz/*"]
+  verbs: ["get"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: falco
+  labels:
+    app.kubernetes.io/name: falco
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: falco
+subjects:
+- kind: ServiceAccount
+  name: falco
+  namespace: falco-system
+
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: falco
+  namespace: falco-system
+  labels:
+    app.kubernetes.io/name: falco
+    app.kubernetes.io/component: runtime-security
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: falco
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: falco
+        app.kubernetes.io/component: runtime-security
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8765"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: falco
+      hostNetwork: true
+      hostPID: true
+      hostIPC: true
+      tolerations:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/master
+        operator: Exists
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/control-plane
+        operator: Exists
+      containers:
+      - name: falco
+        image: falcosecurity/falco-no-driver:0.36.2
+        imagePullPolicy: IfNotPresent
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "100m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        securityContext:
+          privileged: true
+        args:
+        - /usr/bin/falco
+        - --cri=/run/containerd/containerd.sock
+        - --cri=/run/crio/crio.sock
+        - --cri=/var/run/docker.sock
+        - -K=/var/run/secrets/kubernetes.io/serviceaccount/token
+        - -k=https://$(KUBERNETES_SERVICE_HOST)
+        - --k8s-node=$(FALCO_K8S_NODE_NAME)
+        - -pk
+        env:
+        - name: FALCO_K8S_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: FALCO_GRPC_BIND_ADDRESS
+          value: "unix:///var/run/falco/falco.sock"
+        - name: FALCO_GRPC_ENABLED
+          value: "true"
+        volumeMounts:
+        - mountPath: /etc/falco
+          name: falco-config
+        - mountPath: /var/run/falco
+          name: falco-grpc
+        - mountPath: /host/var/run/docker.sock
+          name: docker-socket
+          readOnly: true
+        - mountPath: /host/run/containerd/containerd.sock
+          name: containerd-socket
+          readOnly: true
+        - mountPath: /host/run/crio/crio.sock
+          name: crio-socket
+          readOnly: true
+        - mountPath: /host/dev
+          name: dev-fs
+          readOnly: true
+        - mountPath: /host/proc
+          name: proc-fs
+          readOnly: true
+        - mountPath: /host/boot
+          name: boot-fs
+          readOnly: true
+        - mountPath: /host/lib/modules
+          name: lib-modules
+          readOnly: true
+        - mountPath: /host/usr
+          name: usr-fs
+          readOnly: true
+        - mountPath: /host/etc
+          name: etc-fs
+          readOnly: true
+        - mountPath: /var/log/falco
+          name: falco-logs
+        livenessProbe:
+          initialDelaySeconds: 60
+          timeoutSeconds: 5
+          periodSeconds: 15
+          httpGet:
+            path: /healthz
+            port: 8765
+        readinessProbe:
+          initialDelaySeconds: 30
+          timeoutSeconds: 5
+          periodSeconds: 15
+          httpGet:
+            path: /healthz
+            port: 8765
+      - name: falco-exporter
+        image: falcosecurity/falco-exporter:0.8.2
+        imagePullPolicy: IfNotPresent
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+        args:
+        - --client-socket=unix:///var/run/falco/falco.sock
+        - --listen-address=0.0.0.0:9376
+        - --metrics-interval=30s
+        ports:
+        - containerPort: 9376
+          name: metrics
+          protocol: TCP
+        volumeMounts:
+        - mountPath: /var/run/falco
+          name: falco-grpc
+        livenessProbe:
+          httpGet:
+            path: /metrics
+            port: 9376
+          initialDelaySeconds: 60
+          periodSeconds: 15
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /metrics
+            port: 9376
+          initialDelaySeconds: 30
+          periodSeconds: 15
+          timeoutSeconds: 5
+      volumes:
+      - name: falco-config
+        configMap:
+          name: falco-config
+          items:
+          - key: falco.yaml
+            path: falco.yaml
+          - key: consciousness_rules.yaml
+            path: consciousness_rules.yaml
+      - name: falco-grpc
+        emptyDir: {}
+      - name: docker-socket
+        hostPath:
+          path: /var/run/docker.sock
+          type: Socket
+      - name: containerd-socket
+        hostPath:
+          path: /run/containerd/containerd.sock
+          type: Socket
+      - name: crio-socket
+        hostPath:
+          path: /run/crio/crio.sock
+          type: Socket
+      - name: dev-fs
+        hostPath:
+          path: /dev
+      - name: proc-fs
+        hostPath:
+          path: /proc
+      - name: boot-fs
+        hostPath:
+          path: /boot
+      - name: lib-modules
+        hostPath:
+          path: /lib/modules
+      - name: usr-fs
+        hostPath:
+          path: /usr
+      - name: etc-fs
+        hostPath:
+          path: /etc
+      - name: falco-logs
+        hostPath:
+          path: /var/log/falco
+          type: DirectoryOrCreate
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: falco
+  namespace: falco-system
+  labels:
+    app.kubernetes.io/name: falco
+    app.kubernetes.io/component: runtime-security
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9376"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - name: grpc
+    port: 5060
+    targetPort: 5060
+    protocol: TCP
+  - name: http
+    port: 8765
+    targetPort: 8765
+    protocol: TCP
+  - name: metrics
+    port: 9376
+    targetPort: 9376
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: falco
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: consciousness-security-webhook
+  namespace: falco-system
+  labels:
+    app.kubernetes.io/name: consciousness-security-webhook
+    app.kubernetes.io/component: alerting
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: consciousness-security-webhook
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: consciousness-security-webhook
+        app.kubernetes.io/component: alerting
+    spec:
+      containers:
+      - name: webhook
+        image: consciousness-security-webhook:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        env:
+        - name: SLACK_WEBHOOK_URL
+          valueFrom:
+            secretKeyRef:
+              name: consciousness-security-secrets
+              key: slack-webhook-url
+              optional: true
+        - name: PAGERDUTY_INTEGRATION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: consciousness-security-secrets
+              key: pagerduty-integration-key
+              optional: true
+        - name: LOG_LEVEL
+          value: "INFO"
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: consciousness-security-webhook
+  namespace: falco-system
+  labels:
+    app.kubernetes.io/name: consciousness-security-webhook
+    app.kubernetes.io/component: alerting
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: consciousness-security-webhook
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: consciousness-security-secrets
+  namespace: falco-system
+  labels:
+    app.kubernetes.io/name: consciousness-security-webhook
+type: Opaque
+data:
+  # These should be replaced with actual base64-encoded values
+  slack-webhook-url: ""      # Base64 encoded Slack webhook URL
+  pagerduty-integration-key: "" # Base64 encoded PagerDuty integration key
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: falco
+  namespace: falco-system
+  labels:
+    app.kubernetes.io/name: falco
+    app.kubernetes.io/component: runtime-security
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: falco
+  endpoints:
+  - port: metrics
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: falco-network-policy
+  namespace: falco-system
+  labels:
+    app.kubernetes.io/name: falco
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: falco
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 9376
+    - protocol: TCP
+      port: 8765
+  egress:
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443  # For webhook notifications
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    ports:
+    - protocol: TCP
+      port: 443  # Kubernetes API
