@@ -1,4 +1,5 @@
-﻿import React from 'react';
+/* eslint-disable unicode-bom */
+import React from 'react';
 import ReactDOM from 'react-dom/client';
 import ProductionApp from './App.production';
 
@@ -49,4 +50,4 @@ try {
 }
 
 (window as any).__productionMode = true;
-(window as any).__apiUrl = 'http://localhost:3000/api/v1';
+(window as any).__apiUrl = process.env.REACT_APP_API_BASE_URL || 'https://api.chatbotaurus.com';
